@@ -1,0 +1,6 @@
+{
+  "name": "V12 SonicStream",
+  "description": "The Business Operating System for All Creators, providing a unified hub for Website Building, Marketplace, Booking, Printing, Ticketing, Memberships, Fan CRM, Affiliate Programs, AI Marketing, and Commerce.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

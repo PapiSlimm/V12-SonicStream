@@ -1,0 +1,338 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields: uid, email, displayName, userType, isPro, avatarUrl, bio, createdAt
+    //
+    // Collection: tracks
+    // Fields: title, artistName, artistId, genre, fileUrl, coverUrl, duration, status, uploaderId, createdAt
+    //
+    // Collection: artists
+    // Fields: uid, name, genre, bio, imageUrl, bannerUrl, basePrice, isVerified, createdAt
+    //
+    // Collection: events
+    // Fields: title, description, date, venue, city, price, ticketsAvailable, artistId, artistName, organizerId, imageUrl
+    //
+    // Collection: bookings
+    // Fields: artistId, artistName, customerId, customerName, startTime, endTime, status, totalAmount, createdAt
+    //
+    // Collection: venues
+    // Fields: name, description, address, city, capacity, techRider, ownerId, isVerified, createdAt
+    //
+    // Collection: products
+    // Fields: sellerId, name, description, price, type, imageUrl, fileUrl, stock, status, createdAt
+    //
+    // Collection: sales
+    // Fields: productId, sellerId, buyerId, amount, status, stripeSessionId, createdAt
+    //
+    // Collection: custom_sites
+    // Fields: userId, subdomain, theme, layout, components, status, createdAt, updatedAt
+    //
+    // Collection: verification_requests
+    // Fields: userId, userName, userEmail, idImageUrl, socialLinks, status, adminNotes, createdAt, updatedAt
+    //
+    // Collection: artist_analytics
+    // Fields: artistId, totalStreams, monthlyListeners, revenue, dailyStreams, weeklyStreams, monthlyStreams, revenueByPlatform, demographics, updatedAt
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'admin' ||
+         request.auth.token.email == "papislimm@gmail.com");
+    }
+
+    function isArtist() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'artist';
+    }
+
+    function isCreator() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'creator';
+    }
+
+    function isBusiness() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'business';
+    }
+
+    function isVenue() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'venue';
+    }
+
+    function isVisionary() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionTier == 'visionary';
+    }
+
+    function isPro() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionTier == 'pro';
+    }
+
+    function isPremiumEventUser() {
+      return isArtist() || isCreator() || isBusiness() || isVenue() || isVisionary() || isPro();
+    }
+
+    // Validators
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'userType']) &&
+             data.uid is string && data.email is string &&
+             data.userType in ['listener', 'artist', 'admin', 'creator', 'business', 'venue'] &&
+             (!('profileId' in data) || data.profileId is string);
+    }
+
+    function isValidTrack(data) {
+      return data.keys().hasAll(['title', 'artistName', 'fileUrl', 'uploaderId']) &&
+             data.title is string && data.title.size() < 200 &&
+             data.uploaderId == request.auth.uid &&
+             (!('albumId' in data) || data.albumId is string) &&
+             (!('externalIds' in data) || data.externalIds is map);
+    }
+
+    function isValidPlaylist(data) {
+      return data.keys().hasAll(['userId', 'title', 'trackIds']) &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() < 100 &&
+             data.trackIds is list;
+    }
+
+    function isValidAlbum(data) {
+      return data.keys().hasAll(['artistId', 'title', 'type', 'trackIds']) &&
+             data.artistId == request.auth.uid &&
+             data.title is string && data.title.size() < 200 &&
+             data.type in ['album', 'ep', 'single'] &&
+             data.trackIds is list;
+    }
+
+    function isValidPlayHistory(data) {
+      return data.keys().hasAll(['userId', 'trackId', 'playedAt']) &&
+             data.userId == request.auth.uid &&
+             data.trackId is string &&
+             data.playedAt is string;
+    }
+
+    function isValidLike(data) {
+      return data.keys().hasAll(['userId', 'targetId', 'targetType']) &&
+             data.userId == request.auth.uid &&
+             data.targetId is string &&
+             data.targetType in ['track', 'album', 'playlist'];
+    }
+
+    function isValidProAsset(data) {
+      return data.keys().hasAll(['name', 'type', 'file_url', 'required_tier']) &&
+             data.name is string &&
+             data.type in ["overlay", "transition", "sfx", "lut", "motion_graphic", "bg_music"] &&
+             data.required_tier in ["visionary", "pro"];
+    }
+
+    function isValidArtist(data) {
+      return data.keys().hasAll(['uid', 'name']) &&
+             data.uid == request.auth.uid;
+    }
+
+    function isValidEvent(data) {
+      return data.keys().hasAll(['title', 'date', 'time', 'venue', 'organizerId']) &&
+             data.organizerId == request.auth.uid;
+    }
+
+    function isValidVerificationRequest(data) {
+      return data.keys().hasAll(['userId', 'userName', 'idImageUrl', 'status', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.status == 'pending';
+    }
+
+    function isValidArtistAnalytics(data) {
+      return data.keys().hasAll(['artistId', 'totalStreams', 'updatedAt']);
+    }
+
+    function isValidBooking(data) {
+      return data.keys().hasAll(['artistId', 'customerId', 'startTime', 'status']) &&
+             (data.customerId == request.auth.uid || data.artistId == request.auth.uid || data.eventId != null);
+    }
+
+    function isValidVenue(data) {
+      return data.keys().hasAll(['name', 'address', 'city', 'capacity', 'ownerId']) &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['sellerId', 'name', 'price', 'type', 'status']) &&
+             data.sellerId == request.auth.uid;
+    }
+
+    function isValidSale(data) {
+      return data.keys().hasAll(['productId', 'sellerId', 'buyerId', 'amount', 'status']) &&
+             (data.buyerId == request.auth.uid || data.sellerId == request.auth.uid);
+    }
+
+    function isValidCustomSite(data) {
+      return data.keys().hasAll(['userId', 'subdomain', 'status']) &&
+             data.userId == request.auth.uid &&
+             data.subdomain is string && data.subdomain.size() < 50 &&
+             data.status in ['draft', 'published'];
+    }
+
+    function isValidMasteringPreset(data) {
+      return data.keys().hasAll(['userId', 'name', 'profile']) &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() < 100 &&
+             data.profile is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /tracks/{trackId} {
+      allow read: if true;
+      allow create: if isArtist() && isValidTrack(request.resource.data);
+      allow update: if (isAuthenticated() && (resource.data.uploaderId == request.auth.uid || isAdmin())) && isValidTrack(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.uploaderId == request.auth.uid || isAdmin());
+    }
+
+    match /artists/{artistId} {
+      allow read: if true;
+      allow create: if isArtist() && isValidArtist(request.resource.data);
+      allow update: if (isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin())) && isValidArtist(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /events/{eventId} {
+      allow read: if true;
+      allow create: if (isPremiumEventUser() || isAdmin()) && isValidEvent(request.resource.data);
+      allow update: if (isAuthenticated() && (resource.data.organizerId == request.auth.uid || isAdmin())) && isValidEvent(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.organizerId == request.auth.uid || isAdmin());
+    }
+
+    match /venues/{venueId} {
+      allow read: if true;
+      allow create: if (isVenue() || isAdmin()) && isValidVenue(request.resource.data);
+      allow update: if (isAuthenticated() && (resource.data.ownerId == request.auth.uid || isAdmin())) && isValidVenue(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if (isArtist() || isCreator() || isAdmin()) && isValidProduct(request.resource.data);
+      allow update: if (isAuthenticated() && (resource.data.sellerId == request.auth.uid || isAdmin())) && isValidProduct(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || isAdmin());
+    }
+
+    match /sales/{saleId} {
+      allow read: if isAuthenticated() && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdmin());
+      allow create: if false; // Only via backend webhook
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.artistId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidBooking(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.customerId == request.auth.uid || resource.data.artistId == request.auth.uid || isAdmin()) && isValidBooking(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /follows/{followId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if isAdmin();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_read']);
+    }
+
+    match /custom_sites/{siteId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidCustomSite(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidCustomSite(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /mastering_presets/{presetId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidMasteringPreset(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidMasteringPreset(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /playlists/{playlistId} {
+      allow read: if resource.data.isPublic == true || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && isValidPlaylist(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidPlaylist(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /albums/{albumId} {
+      allow read: if true;
+      allow create: if isArtist() && isValidAlbum(request.resource.data);
+      allow update: if (isAuthenticated() && (resource.data.artistId == request.auth.uid || isAdmin())) && isValidAlbum(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.artistId == request.auth.uid || isAdmin());
+    }
+
+    match /play_history/{historyId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidPlayHistory(request.resource.data);
+      allow update: if false;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /likes/{likeId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidLike(request.resource.data);
+      allow update: if false;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /pro_assets/{assetId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /verification_requests/{requestId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidVerificationRequest(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /artist_analytics/{analyticsId} {
+      allow read: if isAuthenticated() && (resource.data.artistId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /last_played_positions/{positionId} {
+      allow read, write: if isAuthenticated() && (positionId.startsWith(request.auth.uid) || (resource != null && resource.data.userId == request.auth.uid) || (request.resource != null && request.resource.data.userId == request.auth.uid));
+    }
+
+    match /_test_connection_/{docId} {
+      allow read: if true;
+    }
+  }
+}

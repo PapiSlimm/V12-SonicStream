@@ -1,0 +1,86 @@
+[
+  {
+    "name": "Music Promo Generator",
+    "type": "video",
+    "preview_url": "https://cdn.pixabay.com/video/2023/10/20/185834-876356832_tiny.mp4",
+    "config": "{\"duration\": 30, \"aspectRatio\": \"16:9\", \"vibe\": \"cinematic\", \"resolution\": \"1080p\", \"audioSway\": true}",
+    "required_tier": "SonicPro"
+  },
+  {
+    "name": "Album Launch Campaign",
+    "type": "video",
+    "preview_url": "https://cdn.pixabay.com/video/2023/05/23/164187-829643444_tiny.mp4",
+    "config": "{\"duration\": 60, \"aspectRatio\": \"9:16\", \"vibe\": \"hype\", \"resolution\": \"1080p\", \"particles\": \"gold_dust\"}",
+    "required_tier": "SonicPro"
+  },
+  {
+    "name": "Podcast Intro Generator",
+    "type": "video",
+    "preview_url": "https://cdn.pixabay.com/video/2023/08/15/176214-855146522_tiny.mp4",
+    "config": "{\"duration\": 15, \"aspectRatio\": \"16:9\", \"vibe\": \"waves\", \"resolution\": \"1080p\", \"neonBorders\": true}",
+    "required_tier": "SonicPro"
+  },
+  {
+    "name": "Concert Flyer Creator",
+    "type": "video",
+    "preview_url": "https://cdn.pixabay.com/video/2023/09/11/179612-862664534_tiny.mp4",
+    "config": "{\"duration\": 10, \"aspectRatio\": \"1:1\", \"vibe\": \"grungy_neon\", \"resolution\": \"1080p\", \"glitch\": \"medium\"}",
+    "required_tier": "SonicPro"
+  },
+  {
+    "name": "Social Media Ad Generator",
+    "type": "video",
+    "preview_url": "https://cdn.pixabay.com/video/2023/10/20/185834-876356832_tiny.mp4",
+    "config": "{\"duration\": 15, \"aspectRatio\": \"9:16\", \"vibe\": \"modern_editorial\", \"resolution\": \"1080p\", \"overlay\": \"clean_split\"}",
+    "required_tier": "everyone"
+  },
+  {
+    "name": "Artist Website Builder",
+    "type": "video",
+    "preview_url": "https://cdn.pixabay.com/video/2023/05/23/164187-829643444_tiny.mp4",
+    "config": "{\"duration\": 45, \"aspectRatio\": \"16:9\", \"vibe\": \"sleek_interactive\", \"resolution\": \"4k\", \"wireframe\": false}",
+    "required_tier": "SonicPro"
+  },
+  {
+    "name": "Lo-Fi Beats Background",
+    "type": "video",
+    "preview_url": "https://cdn.pixabay.com/video/2023/08/15/176214-855146522_tiny.mp4",
+    "config": "{\"duration\": 120, \"aspectRatio\": \"16:9\", \"vibe\": \"retro_chill\", \"resolution\": \"1080p\", \"filter\": \"analog_warmth\"}",
+    "required_tier": "everyone"
+  },
+  {
+    "name": "Cinematic Track Teaser",
+    "type": "video",
+    "preview_url": "https://cdn.pixabay.com/video/2023/09/11/179612-862664534_tiny.mp4",
+    "config": "{\"duration\": 30, \"aspectRatio\": \"9:16\", \"vibe\": \"epic_epic\", \"resolution\": \"4k\", \"bassReactive\": true}",
+    "required_tier": "SonicPro"
+  },
+  {
+    "name": "Ambient Chill Out",
+    "type": "music",
+    "preview_url": "",
+    "config": "{\"bpm\": 90, \"scale\": \"Pentatonic Major\", \"reverb\": 0.8, \"synth_engine\": \"pad_space\"}",
+    "required_tier": "everyone"
+  },
+  {
+    "name": "Upbeat Corporate",
+    "type": "music",
+    "preview_url": "",
+    "config": "{\"bpm\": 120, \"scale\": \"C Major\", \"reverb\": 0.3, \"synth_engine\": \"acoustic_piano_plus\"}",
+    "required_tier": "everyone"
+  },
+  {
+    "name": "Cyberpunk Synthwave",
+    "type": "music",
+    "preview_url": "",
+    "config": "{\"bpm\": 115, \"scale\": \"A Minor\", \"reverb\": 0.5, \"synth_engine\": \"retrowave_saw\"}",
+    "required_tier": "SonicPro"
+  },
+  {
+    "name": "Minimalist Piano",
+    "type": "music",
+    "preview_url": "",
+    "config": "{\"bpm\": 75, \"scale\": \"D Major\", \"reverb\": 0.9, \"synth_engine\": \"concert_grand\"}",
+    "required_tier": "SonicPro"
+  }
+]

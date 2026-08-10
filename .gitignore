@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Storage
+storage/
+uploads/
+*.log
+logs/
+tmp/
+temp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+coverage/
+.nyc_output/
+
+# Secrets
+*.pem
+*.key
+*.crt
+firebase-*.json
+*-service-account.json
+
+# Service registry
+.service-registry.json
+
+# Misc
+*.pid
+*.seed
+*.pid.lock
+_to_delete/
+ecosystem-inbox.jsonl
+rmpm-ecosystem-inbox.jsonl
+rmpm-campaigns.jsonl
+__pycache__/
+*.pyc
+.pytest_cache/

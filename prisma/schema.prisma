@@ -1,0 +1,132 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String           @id @default(uuid())
+  email         String           @unique
+  name          String?
+  password      String
+  isVerified    Boolean          @default(false)
+  stripeVerificationId String?
+  createdAt     DateTime         @default(now())
+  subscription  Subscription?
+  messages      Message[]
+  aiConversations AIConversation[]
+  feedback      Feedback[]
+  projects      Project[]
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  status      String   @default("Initial") // 'Initial', 'In Production', 'Review', 'Live', 'Completed'
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  brief       Brief?
+  assets      Asset[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Brief {
+  id              String   @id @default(uuid())
+  projectId       String   @unique
+  project         Project  @relation(fields: [projectId], references: [id])
+  goals           String
+  targetAudience  String?
+  visualReference String?
+  aiProposedStory String?  // Store Gemini generated content here
+  createdAt       DateTime @default(now())
+}
+
+model Asset {
+  id        String    @id @default(uuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id])
+  name      String
+  url       String
+  type      String    // 'video' | 'audio' | 'image'
+  stage     String    @default("Raw") // 'Raw', 'Draft', 'Final'
+  comments  Comment[]
+  createdAt DateTime  @default(now())
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id])
+  userId    String   // Who made the comment
+  content   String
+  timestamp Float?   // For audio/video timestamped marks (seconds)
+  frame     Int?     // For frame-accurate video markers
+  createdAt DateTime @default(now())
+}
+
+model Subscription {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  plan              String   @default("free")
+  status            String   @default("active")
+  stripeCustomerId  String?
+  createdAt         DateTime @default(now())
+}
+
+model ChatRoom {
+  id        String    @id @default(uuid())
+  name      String
+  createdAt DateTime  @default(now())
+  messages  Message[]
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      ChatRoom @relation(fields: [roomId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model AIConversation {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  createdAt DateTime    @default(now())
+  messages  AIMessage[]
+}
+
+model AIMessage {
+  id             String         @id @default(uuid())
+  conversationId String
+  conversation   AIConversation @relation(fields: [conversationId], references: [id])
+  role           String         // 'user' | 'assistant'
+  content        String
+  createdAt      DateTime       @default(now())
+}
+
+model Post {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Feedback {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  message   String
+  createdAt DateTime @default(now())
+}
