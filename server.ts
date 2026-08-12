@@ -95,6 +95,8 @@ import constitutionRouter from './server/routes/constitution.js';
 import { initConstitution, constitutionGuard } from './server/constitution/engine.js';
 import { initEcosystemPublisher } from './server/services/EcosystemPublisher.js';
 import { createFeedIntake } from './ecosystem/v12-feed-intake.js';
+import designAgentRouter from './server/routes/design-agent.js';
+import monetizeRouter from './server/routes/monetize.js';
 import { rateLimit as customRateLimit } from './server/middleware/rateLimit.js';
 
 let io: Server;
@@ -470,6 +472,13 @@ function initRoutes(app: Express) {
 
   // V12 Constitution: human authority routes (admin-only halt/resume/status).
   app.use('/api/constitution', customRateLimit({ max: 30 }), constitutionRouter);
+
+  // Web builder design agent: generate/refine in place + AI warehouse & factory.
+  app.use('/api/design-agent', customRateLimit({ max: 30 }), designAgentRouter);
+
+  // Monetization: terms, earning avenues, all-in pricing, top-20 social
+  // sharing, radio sponsorships — accounted via Headless Financial.
+  app.use('/api/monetize', customRateLimit({ max: 60 }), monetizeRouter);
 
   // Legacy direct layout compatibility
   app.use('/api/v1/identity', userRouter);

@@ -10,13 +10,15 @@ $ErrorActionPreference = "Continue"
 $desktop = "$env:USERPROFILE\Desktop"
 
 $repos = @(
-  @{ Path = "SONIC STREAM";   Msg = "Ecosystem bus + V12 Constitution enforcement + feed syndication publisher/intake; Stripe webhook path fix; stabilization scripts" },
+  @{ Path = "SONIC STREAM";   Msg = "Radio (synchronized broadcast, royalties, AI host), monetization (all-in pricing, top-20 sharing, sponsorships, Headless Financial), web builder (design agent, 45 templates, 32 animations), Constitution, ecosystem bus + feed syndication, Earnings page" },
   @{ Path = "V12 WEB";        Msg = "V12 Constitution enforcement (anchored engine, Article X routes, ADMIN_EMAILS authority)" },
   @{ Path = "RM PM";          Msg = "Marketing loop: ecosystem feed intake + Sentinel-classified reviews, suggestion channel to SonicStream, campaign engine with City World + Inspectorate launch gates" },
   @{ Path = "SOCIOFY";        Msg = "Ecosystem: real feed-post handlers for SonicStream tracks/media; rmpm registered; marketing.campaign.launched event added to contract" },
   @{ Path = "CEOS";           Msg = "Ecosystem consumers: SonicStream tracks/media and R.M.P.M campaigns -> Creator Economy Feed + V12 Marketplace cards" },
   @{ Path = "ORION PRIME";    Msg = "V12 feed intake mounted (signed envelope inbox for City World evidence)" },
-  @{ Path = "V12 APEX ATLAS"; Msg = "V12 feed intake mounted (signed envelope inbox as Atlas admission-review queue)" }
+  @{ Path = "V12 APEX ATLAS"; Msg = "V12 feed intake mounted (signed envelope inbox as Atlas admission-review queue)" },
+  @{ Path = "HEADLESS FINACIAL"; Msg = "Security harness: hash-chained books, MoneyGuard, rate limiting, input sentry, human halt switch; V12 ecosystem intake receives finance.transaction.recorded as system of record" },
+  @{ Path = "SonicWave";      Msg = "V12 ecosystem feed intake mounted (radio now-playing, campaigns, peer events)" }
 )
 
 # Safety net: these must never be committed, in any repo.

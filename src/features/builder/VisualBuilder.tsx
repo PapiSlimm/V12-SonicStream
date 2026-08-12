@@ -21,6 +21,10 @@ import {
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
 import { CheckoutModal } from '../../components/commerce/CheckoutModal';
+import { DesignAgent } from './DesignAgent';
+import { TemplateGallery } from './TemplateGallery';
+import { AnimationKeyframes } from './animations';
+import { LayoutTemplate } from 'lucide-react';
 
 import { Meta } from '../../components/SEO/Meta';
 
@@ -52,6 +56,7 @@ export const VisualBuilder = () => {
   const [showDomainSettings, setShowDomainSettings] = useState(false);
   const [cart, setCart] = useState<any[]>([]);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   // Determine active SEO (block override or page default)
   const activeBlock = blocks.find(b => b.id === activeBlockId);
@@ -132,9 +137,33 @@ export const VisualBuilder = () => {
         description={currentDescription}
         image={currentOgImage}
       />
+      {/* Animation keyframes for every preset (templates + agent + manual) */}
+      <AnimationKeyframes />
+
+      {/* Template gallery — 45 concepts, all fully editable after loading */}
+      <TemplateGallery
+        open={showTemplates}
+        onClose={() => setShowTemplates(false)}
+        hasBlocks={blocks.length > 0}
+        onLoad={(loaded) => { setBlocks(loaded as unknown as Block[]); setActiveBlockId(null); }}
+      />
+
+      {/* Canvas-native professional design agent (+ AI warehouse & factory) */}
+      <DesignAgent
+        blocks={blocks as any}
+        setBlocks={(next) => setBlocks(next as unknown as Block[])}
+        activeBlockId={activeBlockId}
+      />
+
       {/* Sidebar - Block Library */}
       <div className="w-72 border-r border-white/5 bg-zinc-900/50 p-6 flex flex-col gap-8">
         <div>
+          <button
+            onClick={() => setShowTemplates(true)}
+            className="w-full mb-6 flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600/20 to-cyan-500/20 hover:from-violet-600/30 hover:to-cyan-500/30 border border-violet-500/30 text-violet-300 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all"
+          >
+            <LayoutTemplate size={14} /> Start from a Template
+          </button>
           <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-4">Add Blocks</h3>
           <div className="grid grid-cols-2 gap-3">
             {[

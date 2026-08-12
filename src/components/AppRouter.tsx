@@ -44,6 +44,7 @@ const ProfileSettings = lazy(() => import('../features/profile/ProfileSettings')
 const AdminPanel = lazy(() => import('../features/admin/V12AdminDashboard').then(m => ({ default: m.V12AdminDashboard })));
 const Marketplace = lazy(() => import('../features/marketplace/Marketplace'));
 const RadioHub = lazy(() => import('../features/radio/RadioHub').then(m => ({ default: m.RadioHub })));
+const EarningsPage = lazy(() => import('../features/monetize/EarningsPage').then(m => ({ default: m.EarningsPage })));
 const NewsWall = lazy(() => import('../features/rss/NewsWall').then(m => ({ default: m.NewsWall })));
 const DMCAPortal = lazy(() => import('../features/legal/DMCAPortal').then(m => ({ default: m.DMCAPortal })));
 const PolicyCenter = lazy(() => import('../features/policy/PolicyCenter').then(m => ({ default: m.PolicyCenter })));
@@ -113,6 +114,8 @@ export const AppRouter = () => {
       <Route path="/search" element={wrap(<SearchPage />)} />
       <Route path="/marketplace" element={wrap(<Marketplace />)} />
       <Route path="/radio" element={wrap(<RadioHub />)} />
+      <Route path="/earn" element={wrap(<EarningsPage />)} />
+      <Route path="/earnings" element={wrap(<EarningsPage />)} />
       <Route path="/news" element={wrap(<NewsWall type="news" />)} />
       <Route path="/legal/dmca" element={wrap(<DMCAPortal />)} />
       <Route path="/policy" element={wrap(<PolicyCenter />)} />
