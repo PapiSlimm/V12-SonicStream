@@ -330,6 +330,13 @@ export const RadioHub: React.FC = () => {
               <Zap size={18} className="text-emerald-400" />
               Therapy 432Hz Mode
             </button>
+            <button
+              onClick={() => { window.location.href = '/ai'; }}
+              className="px-10 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-emerald-500 transition-all flex items-center gap-3 shadow-lg"
+            >
+              <Sparkles size={18} />
+              Generate Music
+            </button>
           </div>
         </div>
       </section>

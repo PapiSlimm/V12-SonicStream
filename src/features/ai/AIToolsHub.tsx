@@ -25,13 +25,14 @@ import { CoverArtGenerator } from './CoverArtGenerator';
 import { AIMasteringTool } from '../mastering/AIMasteringTool';
 import { TrackSeparator } from './TrackSeparator';
 import { MusicGenerator } from '../studio/MusicGenerator';
+import { GenerateMusicStudio } from './GenerateMusicStudio';
 import { LyricsAssistant } from './LyricsAssistant';
 import { VideoRefinementStudio } from './VideoRefinementStudio';
 import { AiJobsFeeDashboard } from './AiJobsFeeDashboard';
 
 export const AIToolsHub = () => {
   const { user, isStar, isVisionary, isPro, isEnterprise, isCreatorTier, isAdmin } = useAuth();
-  const [activeTool, setActiveTool] = useState<'motion' | 'fonts' | 'showcase' | 'templates' | 'presets' | 'editor' | 'cover' | 'mastering' | 'separator' | 'melody' | 'lyrics' | 'refinement' | 'ai_jobs_fees'>('mastering');
+  const [activeTool, setActiveTool] = useState<'generate' | 'motion' | 'fonts' | 'showcase' | 'templates' | 'presets' | 'editor' | 'cover' | 'mastering' | 'separator' | 'melody' | 'lyrics' | 'refinement' | 'ai_jobs_fees'>('generate');
   
   const isPaid = isStar || isCreatorTier || isVisionary || isPro || isEnterprise || isAdmin;
 
@@ -45,6 +46,7 @@ export const AIToolsHub = () => {
   };
 
   const allTools = [
+    { id: 'generate', name: 'Generate Music', icon: Sparkles, description: 'AI instant station + text-to-music' },
     { id: 'showcase', name: 'Showcase', icon: Layers, description: 'Explore AI-generated samples' },
     { id: 'motion', name: 'SonicMotion', icon: Video, description: 'AI Motion Graphics Studio', restricted: !isPaid || isCreatorTier, feature: 'VIDEO' },
     { id: 'editor', name: 'Video Editor', icon: Sliders, description: 'Advanced AI Video Editing', restricted: (!isPro && !isEnterprise && !isAdmin) || isCreatorTier, feature: 'VIDEO' },
@@ -165,6 +167,7 @@ export const AIToolsHub = () => {
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
           >
+            {activeTool === 'generate' && <GenerateMusicStudio />}
             {activeTool === 'showcase' && <AnimationShowcase />}
             {activeTool === 'motion' && <SonicMotionStudio />}
             {activeTool === 'editor' && <VideoEditor />}

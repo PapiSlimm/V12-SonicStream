@@ -5,6 +5,9 @@ import { config } from '../config.js';
 import { AppError } from '../middleware/error.js';
 import { checkAILimits } from '../middleware/aiLimits.js';
 import { all, run } from '../db.js';
+import { uploadToGCS, getWritablePath } from '../utils/storage.js';
+import fs from 'node:fs';
+import path from 'node:path';
 import Replicate from 'replicate';
 
 import rateLimit from 'express-rate-limit';
@@ -801,6 +804,118 @@ Format the response strictly as a JSON array of subtitle objects, containing onl
       isFallback: true
     });
   }
+});
+
+// ── V12 Radio "Generate" ────────────────────────────────────────────────────
+
+/**
+ * POST /api/ai/music/instant-station
+ * Assemble a continuous, personalized mix from the LIVE catalog by
+ * genre/mood/energy. No new audio is produced, so this is free/instant.
+ */
+router.post('/music/instant-station', authenticateToken, async (req: AuthRequest, res) => {
+  const { genre, mood, energy } = req.body ?? {};
+  const take = Math.min(Math.max(parseInt(req.body?.limit) || 24, 5), 60);
+  const cols = "id, title, artist, genre, file_url, stream_url, price";
+
+  let queue = genre
+    ? await all<any>(
+        `SELECT ${cols} FROM tracks WHERE status = 'live' AND LOWER(genre) = LOWER(?) ORDER BY RANDOM() LIMIT ?`,
+        [String(genre), take]
+      )
+    : await all<any>(
+        `SELECT ${cols} FROM tracks WHERE status = 'live' ORDER BY RANDOM() LIMIT ?`,
+        [take]
+      );
+
+  // If a narrow genre filter returns too little, widen to the whole catalog.
+  if (queue.length < 3) {
+    queue = await all<any>(
+      `SELECT ${cols} FROM tracks WHERE status = 'live' ORDER BY RANDOM() LIMIT ?`,
+      [take]
+    );
+  }
+
+  const label = [energy, mood, genre].filter(Boolean).join(' ').trim() || 'V12 AutoMix';
+  res.json({
+    station: { name: `${label} Station`, mood: mood ?? null, energy: energy ?? null, genre: genre ?? null },
+    count: queue.length,
+    queue: queue.map((t) => ({
+      id: t.id,
+      title: t.title,
+      artist: t.artist,
+      genre: t.genre,
+      url: t.streamUrl || t.fileUrl || null,
+      price: t.price,
+    })),
+  });
+});
+
+/**
+ * POST /api/ai/music/generate  (PREMIUM)
+ * Real AI audio generation via Replicate MusicGen. The result is stored in GCS
+ * and, optionally, published as a sellable track. Paid-tier gated + usage-counted
+ * by checkAILimits; settlement/fee tracking flows through Headless Financial
+ * downstream via the standard track-sale pipeline.
+ */
+router.post('/music/generate', authenticateToken, checkAILimits, async (req: AuthRequest, res) => {
+  const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim() : '';
+  if (prompt.length < 3) throw new AppError('A text prompt describing the music is required.', 400);
+  if (!config.REPLICATE_API_TOKEN) {
+    throw new AppError('AI audio generation is not configured (REPLICATE_API_TOKEN missing).', 503);
+  }
+
+  const duration = Math.min(Math.max(parseInt(req.body?.durationSec) || 15, 5), 30);
+  const replicate = new Replicate({ auth: config.REPLICATE_API_TOKEN });
+
+  // meta/musicgen — text-to-music. stereo-large is the richest quality tier.
+  const output: any = await replicate.run('meta/musicgen', {
+    input: {
+      prompt,
+      duration,
+      model_version: 'stereo-large',
+      output_format: 'mp3',
+      normalization_strategy: 'peak',
+    },
+  });
+
+  const audioUrl: string | undefined = Array.isArray(output)
+    ? output[0]
+    : typeof output === 'string'
+      ? output
+      : output?.audio ?? output?.url;
+  if (!audioUrl) throw new AppError('AI audio generation returned no output. Please try again.', 502);
+
+  // Persist the generated audio to GCS (local path in dev).
+  const resp = await fetch(audioUrl);
+  if (!resp.ok) throw new AppError('Failed to retrieve generated audio.', 502);
+  const buf = Buffer.from(await resp.arrayBuffer());
+  const rel = `ai-music/${req.user?.id ?? 'anon'}-${Date.now()}.mp3`;
+  const tmpPath = getWritablePath(rel);
+  await fs.promises.mkdir(path.dirname(tmpPath), { recursive: true });
+  await fs.promises.writeFile(tmpPath, buf);
+  const storedUrl = await uploadToGCS(tmpPath, rel);
+  await fs.promises.unlink(tmpPath).catch(() => {});
+
+  // Optionally publish as a sellable catalog track (seller sets price).
+  let trackId: number | undefined;
+  const publish = req.body?.publish === true || req.body?.publish === 'true';
+  if (publish) {
+    const title = String(req.body?.title || prompt).slice(0, 120);
+    const parsed = parseFloat(req.body?.price);
+    const priceVal = Number.isFinite(parsed) ? Math.max(0.99, parsed) : 1.99;
+    const isrc = `AI-${req.user?.id ?? 'x'}-${Date.now()}`;
+    const result = await run(
+      "INSERT INTO tracks (owner_user_id, primary_artist_id, display_artist_name, user_id, artist, title, genre, price, is_video, status, file_url, stream_url, isrc, moderation_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'live', ?, ?, ?, 'pending')",
+      [
+        req.user?.id, req.user?.id, req.user?.name ?? 'AI Artist', req.user?.id,
+        req.user?.name ?? 'AI Artist', title, 'AI Generated', priceVal, storedUrl, storedUrl, isrc,
+      ]
+    );
+    trackId = (result as any).lastID;
+  }
+
+  res.json({ url: storedUrl, prompt, durationSec: duration, trackId, published: publish });
 });
 
 export default router;
