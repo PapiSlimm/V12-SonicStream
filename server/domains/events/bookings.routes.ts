@@ -35,7 +35,7 @@ router.post('/price', authenticateToken, requirePro, revenueBlocker, async (req:
   // Demand: confirmed bookings in the next 30d
   const booked = await get<{ cnt: number }>(`
     SELECT COUNT(*) as cnt FROM bookings 
-    WHERE artist_id = ? AND start_time > datetime('now') AND status != 'cancelled'
+    WHERE artist_id = ? AND start_time > CURRENT_TIMESTAMP AND status != 'cancelled'
   `, [artistId]);
 
   const basePrice = artist.price ?? (artist.priceCents ? artist.priceCents / 100 : 0);
@@ -142,7 +142,7 @@ router.get('/events', async (req, res) => {
     SELECT e.*, a.name as artist_name 
     FROM events e 
     JOIN artists a ON e.artist_id = a.id
-    WHERE e.date > datetime('now')
+    WHERE e.date > CURRENT_TIMESTAMP
   `;
   const params: any[] = [];
 

@@ -372,12 +372,12 @@ export const processFFmpeg = async (job: Job) => {
 
     logger.info(`Track ${trackId} processed successfully`);
     await run(
-      'UPDATE tracks SET status = "live", stream_url = ?, dash_url = ?, preview_url = ? WHERE id = ?', 
+      "UPDATE tracks SET status = 'live', stream_url = ?, dash_url = ?, preview_url = ? WHERE id = ?", 
       [streamUrl, dashUrl, previewUrl, trackId]
     );
   } catch (error) {
     logger.error(`FFmpeg processing failed for track ${trackId}:`, error);
-    await run('UPDATE tracks SET status = "error" WHERE id = ?', [trackId]);
+    await run("UPDATE tracks SET status = 'error' WHERE id = ?", [trackId]);
     throw error;
   } finally {
     // Cleanup
@@ -418,11 +418,11 @@ export const processMastering = async (job: { data: any, id?: string }) => {
       dbFileUrl = `/${outputPath.replace(/\\/g, '/')}`;
     }
 
-    await run('UPDATE tracks SET file_url = ?, status = "live" WHERE id = ?', [dbFileUrl, trackId]);
+    await run("UPDATE tracks SET file_url = ?, status = 'live' WHERE id = ?", [dbFileUrl, trackId]);
     logger.info(`Track ${trackId} mastered successfully`);
   } catch (error) {
     logger.error(`Mastering failed for track ${trackId}:`, error);
-    await run('UPDATE tracks SET status = "error" WHERE id = ?', [trackId]);
+    await run("UPDATE tracks SET status = 'error' WHERE id = ?", [trackId]);
     throw error;
   }
 };
@@ -437,12 +437,12 @@ export const processDistribution = async (job: { data: { releaseId: string }, id
     }
 
     // Update status to packaging
-    await db.run('UPDATE releases SET status = "VALIDATING" WHERE id = ?', [releaseId]);
-    await db.run('UPDATE releases SET status = "ERROR" WHERE id = ?', [releaseId]);
+    await db.run("UPDATE releases SET status = 'VALIDATING' WHERE id = ?", [releaseId]);
+    await db.run("UPDATE releases SET status = 'ERROR' WHERE id = ?", [releaseId]);
     throw new Error('Music distribution services are not supported at this time.');
   } catch (err) {
     logger.error(`[Distribution Worker Error] Failed to distribute release ${releaseId}:`, err);
-    await db.run('UPDATE releases SET status = "ERROR" WHERE id = ?', [releaseId]);
+    await db.run("UPDATE releases SET status = 'ERROR' WHERE id = ?", [releaseId]);
     throw err;
   }
 };

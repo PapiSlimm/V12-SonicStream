@@ -7,7 +7,7 @@ COPY package*.json ./
 COPY tsconfig*.json ./
 # --ignore-scripts: postinstall runs `npm run build`, which must not fire before
 # the source is copied in.
-RUN npm ci --ignore-scripts
+RUN npm install --legacy-peer-deps --ignore-scripts
 COPY . .
 RUN npm run build
 
@@ -19,7 +19,7 @@ COPY package*.json ./
 # Production deps only. --ignore-scripts is REQUIRED here: postinstall triggers
 # a full client build, and vite lives in devDependencies — without this flag the
 # image can never build (this was a live bug in the previous Dockerfile).
-RUN npm ci --omit=dev --ignore-scripts
+RUN npm install --omit=dev --legacy-peer-deps --ignore-scripts
 
 # Built bundles + client assets only (never the builder's dev node_modules)
 COPY --from=builder /app/dist ./dist

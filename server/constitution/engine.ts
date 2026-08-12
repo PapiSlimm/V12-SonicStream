@@ -36,9 +36,11 @@ const DOC_PATH = path.join(process.cwd(), 'constitution', 'constitution.yaml');
 const LOCK_PATH = path.join(process.cwd(), 'constitution', 'constitution.lock');
 
 async function ensureTables(): Promise<void> {
+  // Dialect-portable DDL: works on SQLite (dev) and PostgreSQL (prod).
+  // No AUTOINCREMENT (SQLite-only); BIGINT for millisecond epoch timestamps
+  // (a plain INTEGER overflows Postgres' 32-bit range at ~2.1e9).
   await run(`CREATE TABLE IF NOT EXISTS constitution_violations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    at INTEGER NOT NULL,
+    at BIGINT NOT NULL,
     agent_id TEXT NOT NULL,
     tenant_id TEXT,
     article TEXT NOT NULL,
@@ -51,7 +53,7 @@ async function ensureTables(): Promise<void> {
   await run(`CREATE TABLE IF NOT EXISTS constitution_state (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
-    updated_at INTEGER NOT NULL
+    updated_at BIGINT NOT NULL
   )`, []);
 }
 
@@ -89,12 +91,19 @@ export async function initConstitution(): Promise<void> {
     bootDigest = boot.digest;
     bootError = null;
 
-    await ensureTables();
-    const row = await get<{ value: string }>(`SELECT value FROM constitution_state WHERE key = 'halt'`, []);
-    if (row?.value) {
-      const saved = JSON.parse(row.value) as { halted: boolean; reason: string | null; by: string | null };
-      engine.restore({ halted: saved.halted, haltReason: saved.reason, haltedBy: saved.by });
-      if (saved.halted) console.warn('[constitution] ecosystem HALT restored from persistence — human resume required');
+    // Audit persistence is best-effort. If the DB layer has trouble, enforcement
+    // stays active IN MEMORY and the server still boots — the anchor (the real
+    // security gate) has already passed. §1.5 is about the anchor, not the log.
+    try {
+      await ensureTables();
+      const row = await get<{ value: string }>(`SELECT value FROM constitution_state WHERE key = 'halt'`, []);
+      if (row?.value) {
+        const saved = JSON.parse(row.value) as { halted: boolean; reason: string | null; by: string | null };
+        engine.restore({ halted: saved.halted, haltReason: saved.reason, haltedBy: saved.by });
+        if (saved.halted) console.warn('[constitution] ecosystem HALT restored from persistence — human resume required');
+      }
+    } catch (dbErr) {
+      console.error('[constitution] audit store unavailable — enforcement active in-memory only:', dbErr);
     }
     console.log(`[constitution] ${boot.engine.meta().instrument} v${boot.version} anchored (${boot.digest.slice(0, 12)}…) — enforcement active`);
   } catch (err) {

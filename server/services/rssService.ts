@@ -1,4 +1,8 @@
-import { run, all, db, getDB } from '../db.js';
+import { run, all, db, getDB, isPostgres } from '../db.js';
+
+// Portable "time ago" SQL fragment: Postgres uses INTERVAL, SQLite uses datetime modifiers.
+const ago = (sqliteMod: string, pgInterval: string): string =>
+  isPostgres() ? `(NOW() - INTERVAL '${pgInterval}')` : `datetime('now', '${sqliteMod}')`;
 import { registry } from './ServiceRegistry.js';
 import { config } from '../config.js';
 import { GoogleGenAI } from "@google/genai";
@@ -20,8 +24,21 @@ export async function refreshRSSFeeds() {
   console.log('Refreshing RSS feeds...');
   
   try {
-    // Ensure rss_feeds table exists before we perform any operations on it
-    await run(`
+    // Ensure rss_feeds table exists before we perform any operations on it.
+    // MigrationService is the schema authority; this is a defensive create that
+    // must be dialect-correct (Postgres has no AUTOINCREMENT/DATETIME keywords).
+    await run(isPostgres() ? `
+      CREATE TABLE IF NOT EXISTS rss_feeds (
+        id SERIAL PRIMARY KEY,
+        title TEXT,
+        content TEXT,
+        type TEXT,
+        category TEXT,
+        media_url TEXT,
+        author_id TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    ` : `
       CREATE TABLE IF NOT EXISTS rss_feeds (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT,
@@ -39,7 +56,7 @@ export async function refreshRSSFeeds() {
       SELECT r.*, u.name as artist_name 
       FROM releases r 
       JOIN users u ON r.user_id = u.id 
-      WHERE r.status = 'live' AND r.created_at > datetime('now', '-20 minutes')
+      WHERE r.status = 'live' AND r.created_at > ${ago('-20 minutes', '20 minutes')}
     `);
     
     for (const release of releases) {
@@ -56,7 +73,7 @@ export async function refreshRSSFeeds() {
 
     // 2. Recently uploaded videos
     const videos = await all<any>(`
-      SELECT * FROM tracks WHERE is_video = 1 AND created_at > datetime('now', '-20 minutes')
+      SELECT * FROM tracks WHERE is_video = 1 AND created_at > ${ago('-20 minutes', '20 minutes')}
     `);
     for (const video of videos) {
       const trackTitle = typeof video.title === 'string' ? video.title : 'Untitled Video';
@@ -76,7 +93,7 @@ export async function refreshRSSFeeds() {
     // Check if we already have sufficient entertainment news within the last 12 hours
     const countQuery = await all<{ count: number }>(`
       SELECT COUNT(*) as count FROM rss_feeds 
-      WHERE type = 'news' AND category = 'Entertainment News' AND created_at > datetime('now', '-12 hours')
+      WHERE type = 'news' AND category = 'Entertainment News' AND created_at > ${ago('-12 hours', '12 hours')}
     `);
     const currentEntNewsCount = countQuery[0]?.count || 0;
 

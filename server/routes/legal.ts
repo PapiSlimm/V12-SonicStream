@@ -36,7 +36,7 @@ router.post('/dmca', async (req, res) => {
       // Automate "Dark Mode" (Takedown)
       for (const track of (matchingTracks as any[])) {
         await run(
-          'UPDATE tracks SET status = "takedown", updated_at = ? WHERE id = ?',
+          "UPDATE tracks SET status = 'takedown', updated_at = ? WHERE id = ?",
           [new Date().toISOString(), track.id]
         );
         console.log(`[DMCA] Automated Takedown executed for track ID: ${track.id}`);

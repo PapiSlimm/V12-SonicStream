@@ -1,4 +1,4 @@
-import { db } from '../db.js';
+import { db, isPostgres } from '../db.js';
 import { config } from '../config.js';
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -38,7 +38,7 @@ export class FraudService {
     const bursts = await db.get<any>(
       `SELECT COUNT(*) as count 
        FROM ledger_transactions 
-       WHERE user_id = ? AND created_at > datetime('now', '-1 hour')`,
+       WHERE user_id = ? AND created_at > ${isPostgres() ? "(NOW() - INTERVAL '1 hour')" : "datetime('now', '-1 hour')"}`,
       [userId]
     );
 
@@ -75,7 +75,7 @@ export class FraudService {
     const streamAnomaly = await db.get<any>(
       `SELECT COUNT(*) as count, COUNT(DISTINCT track_id) as tracks_count
        FROM stream_logs 
-       WHERE (user_id = ? OR device = ?) AND created_at > datetime('now', '-1 hour')`,
+       WHERE (user_id = ? OR device = ?) AND created_at > ${isPostgres() ? "(NOW() - INTERVAL '1 hour')" : "datetime('now', '-1 hour')"}`,
       [userId, userDevice || 'unknown']
     );
 

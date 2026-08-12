@@ -1,4 +1,4 @@
-import { db } from '../../db.js';
+import { db, isPostgres } from '../../db.js';
 import { GoogleGenAI, Type } from "@google/genai";
 import { config } from '../../config.js';
 
@@ -40,16 +40,17 @@ export class FinancialAIService {
 
     // 2. Refund Rate
     const refundStats = await db.get<{ total: number, refunds: number }>(
-      'SELECT COUNT(*) as total, SUM(CASE WHEN status = "failed" OR type = "refund" THEN 1 ELSE 0 END) as refunds FROM ledger_transactions WHERE user_id = ?',
+      "SELECT COUNT(*) as total, SUM(CASE WHEN status = 'failed' OR type = 'refund' THEN 1 ELSE 0 END) as refunds FROM ledger_transactions WHERE user_id = ?",
       [userId]
     );
     const refundRate = (refundStats?.total || 0) > 0 ? (refundStats!.refunds / refundStats!.total) : 0;
 
     // 3. Growth Rate (Simple Month-over-Month)
+    const monthExpr = isPostgres() ? "to_char(created_at, 'YYYY-MM')" : "strftime('%Y-%m', created_at)";
     const history = await db.all<{ monthly: number, month: string }>(
-      `SELECT SUM(amount) as monthly, strftime('%Y-%m', created_at) as month 
-       FROM ledger_entries 
-       WHERE user_id = ? AND account_type = 'USER' AND amount > 0 
+      `SELECT SUM(amount) as monthly, ${monthExpr} as month
+       FROM ledger_entries
+       WHERE user_id = ? AND account_type = 'USER' AND amount > 0
        GROUP BY month ORDER BY month DESC LIMIT 2`,
       [userId]
     );
@@ -122,7 +123,7 @@ export class FinancialAIService {
     // 5. Query actual play_history stream count for the past 30 days
     const streamStats = await db.get<{ count: number }>(
       `SELECT COUNT(*) as count FROM play_history 
-       WHERE user_id = ? AND created_at > datetime('now', '-30 days')`,
+       WHERE user_id = ? AND created_at > ${isPostgres() ? "(NOW() - INTERVAL '30 days')" : "datetime('now', '-30 days')"}`,
       [userId]
     );
     const actualStreamCount = streamStats?.count ?? 0;

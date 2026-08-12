@@ -673,9 +673,10 @@ async function getOrCreatePoll(roomId: string): Promise<LivePoll> {
   };
 
   await dbRun(
-    'REPLACE INTO active_polls (roomId, id, question, options) VALUES (?, ?, ?, ?)',
+    'INSERT INTO active_polls (roomId, id, question, options) VALUES (?, ?, ?, ?) ON CONFLICT (roomId) DO UPDATE SET id = excluded.id, question = excluded.question, options = excluded.options',
     [roomId, defaultPoll.id, defaultPoll.question, JSON.stringify(defaultPoll.options)]
   ).catch(async () => {
+    // MySQL fallback (no ON CONFLICT support)
     await dbRun(
       'INSERT INTO active_polls (roomId, id, question, options) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = ?, question = ?, options = ?',
       [roomId, defaultPoll.id, defaultPoll.question, JSON.stringify(defaultPoll.options), defaultPoll.id, defaultPoll.question, JSON.stringify(defaultPoll.options)]
@@ -689,9 +690,10 @@ async function getOrCreatePoll(roomId: string): Promise<LivePoll> {
 
 async function savePoll(roomId: string, poll: LivePoll): Promise<void> {
   await dbRun(
-    'REPLACE INTO active_polls (roomId, id, question, options) VALUES (?, ?, ?, ?)',
+    'INSERT INTO active_polls (roomId, id, question, options) VALUES (?, ?, ?, ?) ON CONFLICT (roomId) DO UPDATE SET id = excluded.id, question = excluded.question, options = excluded.options',
     [roomId, poll.id, poll.question, JSON.stringify(poll.options)]
   ).catch(async () => {
+    // MySQL fallback (no ON CONFLICT support)
     await dbRun(
       'INSERT INTO active_polls (roomId, id, question, options) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = ?, question = ?, options = ?',
       [roomId, poll.id, poll.question, JSON.stringify(poll.options), poll.id, poll.question, JSON.stringify(poll.options)]

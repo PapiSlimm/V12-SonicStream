@@ -38,7 +38,7 @@ router.get('/', async (req, res) => {
     SELECT t.* 
     FROM tracks t 
     JOIN users u ON COALESCE(t.owner_user_id, t.user_id) = u.id 
-    WHERE t.status = "live" 
+    WHERE t.status = 'live' 
     AND (u.is_verified = 1 OR u.is_pro = 1 OR t.editorial_featured = 1)
   `);
   
@@ -252,7 +252,7 @@ router.post('/:id/master', authenticateToken, requireArtist, async (req: AuthReq
     profile
   });
   
-  await run('UPDATE tracks SET status = "mastering" WHERE id = ?', [id]);
+  await run("UPDATE tracks SET status = 'mastering' WHERE id = ?", [id]);
   
   res.json({ message: 'Mastering job queued' });
 });

@@ -42,7 +42,7 @@ export const notify = async (userId: number | string, type: string, message: str
 };
 
 export const notifyAdmins = async (type: string, message: string) => {
-  const admins = await all<{ id: number }>('SELECT id FROM users WHERE user_type = "admin"');
+  const admins = await all<{ id: number }>("SELECT id FROM users WHERE user_type = 'admin'");
   await Promise.all(admins.map(a => notify(a.id, type, message)));
 };
 
@@ -181,11 +181,11 @@ export const triggerCampaignChannel = async (campaignId: string): Promise<boolea
     const campaign = await get<any>('SELECT * FROM marketing_campaigns WHERE id = ?', [campaignId]);
     if (!campaign) throw new Error(`Campaign "${campaignId}" not found`);
 
-    await run('UPDATE marketing_campaigns SET status = "processing" WHERE id = ?', [campaignId]);
+    await run("UPDATE marketing_campaigns SET status = 'processing' WHERE id = ?", [campaignId]);
 
     let query = 'SELECT id, email, phone, push_token FROM users WHERE 1=1';
     if (campaign.targetSegment === 'pro')       query += ' AND (subscription_tier = "pro" OR is_pro = 1)';
-    if (campaign.targetSegment === 'listeners') query += ' AND user_type = "listener"';
+    if (campaign.targetSegment === 'listeners') query += " AND user_type = 'listener'";
 
     const targets = await all<any>(query);
     console.log(`[Campaign] "${campaign.name}" — targeting ${targets.length} users`);
@@ -211,11 +211,11 @@ export const triggerCampaignChannel = async (campaignId: string): Promise<boolea
       );
     }
 
-    await run('UPDATE marketing_campaigns SET status = "sent" WHERE id = ?', [campaignId]);
+    await run("UPDATE marketing_campaigns SET status = 'sent' WHERE id = ?", [campaignId]);
     return true;
   } catch (err) {
     console.error(`[Campaign] ${campaignId} failed:`, err);
-    await run('UPDATE marketing_campaigns SET status = "failed" WHERE id = ?', [campaignId]);
+    await run("UPDATE marketing_campaigns SET status = 'failed' WHERE id = ?", [campaignId]);
     return false;
   }
 };

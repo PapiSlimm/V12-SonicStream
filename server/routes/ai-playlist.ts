@@ -47,7 +47,7 @@ async function ensureCuratorsSeeded() {
   console.log(`[Curators Database] Self-seeding real-world active industry curators...`);
   for (const curator of REAL_WORLD_CURATORS) {
     await run(
-      'INSERT OR IGNORE INTO playlist_curators (name, genre, followers, email, spotify, response_rate) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO playlist_curators (name, genre, followers, email, spotify, response_rate) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
       [curator.name, curator.genre, curator.followers, curator.email, curator.spotify, curator.response_rate]
     );
   }

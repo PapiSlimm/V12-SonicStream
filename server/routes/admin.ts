@@ -12,12 +12,12 @@ const router = Router();
 router.use(authenticateAdmin);
 
 router.get('/pending-tracks', async (req, res) => {
-  const tracks = await all<Track>('SELECT * FROM tracks WHERE status = "pending"');
+  const tracks = await all<Track>("SELECT * FROM tracks WHERE status = 'pending'");
   res.json(tracks);
 });
 
 router.post('/approve-track/:id', async (req, res) => {
-  await run('UPDATE tracks SET status = "live", moderation_status = "approved" WHERE id = ?', [req.params.id]);
+  await run("UPDATE tracks SET status = 'live', moderation_status = 'approved' WHERE id = ?", [req.params.id]);
   
   const track = await get<Track>('SELECT * FROM tracks WHERE id = ?', [req.params.id]);
   if (track) {
@@ -28,7 +28,7 @@ router.post('/approve-track/:id', async (req, res) => {
 });
 
 router.post('/reject-track/:id', async (req, res) => {
-  await run('UPDATE tracks SET status = "rejected", moderation_status = "rejected" WHERE id = ?', [req.params.id]);
+  await run("UPDATE tracks SET status = 'rejected', moderation_status = 'rejected' WHERE id = ?", [req.params.id]);
   
   const track = await get<Track>('SELECT * FROM tracks WHERE id = ?', [req.params.id]);
   if (track) {
@@ -44,7 +44,7 @@ router.get('/bookings', async (req, res) => {
 });
 
 router.post('/confirm-booking/:id', async (req, res) => {
-  await run('UPDATE bookings SET status = "confirmed" WHERE id = ?', [req.params.id]);
+  await run("UPDATE bookings SET status = 'confirmed' WHERE id = ?", [req.params.id]);
   
   const booking = await get<Booking>('SELECT * FROM bookings WHERE id = ?', [req.params.id]);
   if (booking) {
@@ -62,7 +62,7 @@ router.post('/confirm-booking/:id', async (req, res) => {
 });
 
 router.get('/payout-requests', async (req, res) => {
-  const payouts = await all<Payout>('SELECT * FROM payouts WHERE status = "pending"');
+  const payouts = await all<Payout>("SELECT * FROM payouts WHERE status = 'pending'");
   res.json(payouts);
 });
 
@@ -213,7 +213,7 @@ router.post('/compliance/:type/:id/:action', async (req, res) => {
     await run('UPDATE copyright_takedowns SET status = ? WHERE id = ?', [status, id]);
     if (action === 'approve') {
       const td = await get<{ track_id: number }>('SELECT track_id FROM copyright_takedowns WHERE id = ?', [id]);
-      if (td) await run('UPDATE tracks SET status = "removed", takedown_status = "removed" WHERE id = ?', [td.track_id]);
+      if (td) await run("UPDATE tracks SET status = 'removed', takedown_status = 'removed' WHERE id = ?", [td.track_id]);
     }
   } else if (type === 'metadata') {
     const status = action === 'approve' ? 'approved' : 'rejected';

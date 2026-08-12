@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticateToken, AuthRequest } from '../identity/auth.js';
-import { run, get } from '../../db.js';
+import { run, get, isPostgres } from '../../db.js';
 import { AppError } from '../../middleware/error.js';
 import { config } from '../../config.js';
 import { StripeService } from './stripe.service.js';
@@ -25,7 +25,7 @@ async function getDemandScore(artistId: string): Promise<number> {
   // platform grows.
   const row = await get<{ count: number }>(
     `SELECT COUNT(*) AS count FROM bookings
-     WHERE artist_id = ? AND created_at > datetime('now', '-7 days')`,
+     WHERE artist_id = ? AND created_at > ${isPostgres() ? "(NOW() - INTERVAL '7 days')" : "datetime('now', '-7 days')"}`,
     [artistId]
   );
   const bookings = row?.count ?? 0;

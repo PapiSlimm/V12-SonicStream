@@ -23,7 +23,7 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req: an
 
   try {
     await IdempotencyService.runIdempotent(`stripe_event_${event.id}`, async () => {
-      await db.run('INSERT OR IGNORE INTO stripe_events (id, type) VALUES (?, ?)', [event.id, event.type]);
+      await db.run('INSERT INTO stripe_events (id, type) VALUES (?, ?) ON CONFLICT (id) DO NOTHING', [event.id, event.type]);
 
       switch (event.type) {
 
@@ -106,7 +106,7 @@ async function handleCheckoutCompleted(session: any) {
       console.log(`[StripeWebhook] Subscription checkout completed for user: ${subUserId}`);
       
       const referral = await db.get(
-        'SELECT * FROM referrals WHERE referredUserId = ? AND status = "active"',
+        "SELECT * FROM referrals WHERE referredUserId = ? AND status = 'active'",
         [subUserId]
       );
       

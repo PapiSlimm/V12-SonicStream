@@ -1,4 +1,4 @@
-import { db } from '../../db.js';
+import { db, isPostgres } from '../../db.js';
 
 export class RevenueEngine {
   /**
@@ -8,7 +8,7 @@ export class RevenueEngine {
   static async adjust(userId: string, tenantId: string, currentPricing: any) {
     const stats = await db.get(
       `SELECT SUM(amount) as volume FROM ledger_entries 
-       WHERE tenant_id = ? AND created_at > datetime('now', '-7 days')`,
+       WHERE tenant_id = ? AND created_at > ${isPostgres() ? "(NOW() - INTERVAL '7 days')" : "datetime('now', '-7 days')"}`,
       [tenantId]
     );
 

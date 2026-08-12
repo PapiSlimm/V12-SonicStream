@@ -177,7 +177,7 @@ router.post('/generate-playlist', authenticateToken, aiLimiter, async (req: Auth
   // 2. Query the database for matching tracks
   // In a real app, we'd use a more sophisticated search or vector DB
   // For this applet, we'll use a combination of genre and keyword matching
-  const allTracks = await all<any>('SELECT * FROM tracks WHERE status = "live" LIMIT 100');
+  const allTracks = await all<any>("SELECT * FROM tracks WHERE status = 'live' LIMIT 100");
   
   // Simple matching logic
   const scoredTracks = allTracks.map(track => {
@@ -611,7 +611,7 @@ router.post('/seed-ai-data', authenticateToken, async (req: AuthRequest, res) =>
 
   for (const t of templates) {
     await run(
-      'INSERT OR IGNORE INTO ai_templates (name, type, preview_url, config, required_tier) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO ai_templates (name, type, preview_url, config, required_tier) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
       [t.name, t.type, t.preview_url, t.config, t.required_tier]
     );
   }
