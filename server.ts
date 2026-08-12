@@ -55,6 +55,7 @@ import notificationsRouter from './server/domains/social/notifications.routes.js
 // Routers (Finance)
 import paymentsRouter from './server/domains/finance/payments.routes.js';
 import royaltiesRouter from './server/domains/finance/royalties.routes.js';
+import salesRouter from './server/domains/finance/sales.routes.js';
 
 // Routers (Events)
 import eventsRouter from './server/domains/events/events.routes.js';
@@ -464,6 +465,7 @@ function initRoutes(app: Express) {
   app.use('/api/brain', brainRouter);
   app.use('/api/legal', legalRouter);
   app.use('/api/marketplace', customRateLimit({ max: 60 }), marketplaceRouter);
+  app.use('/api/sales', customRateLimit({ max: 60 }), salesRouter);
   app.use('/api/tenants', customRateLimit({ max: 60 }), tenantRouter);
 
   // V12 Ecosystem interconnect: ping + SSO handoff (service-token auth,
