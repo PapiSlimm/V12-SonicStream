@@ -341,7 +341,15 @@ export async function runFactory(): Promise<FactoryReport> {
     ]
   );
 
+  // Print the full prioritized report to logs so it is visible without an admin
+  // token, and surface exactly where each report was (or wasn't) delivered.
   console.log(`[agent-factory] ${report.id}: ${report.summary}`);
+  for (const f of findings) {
+    console.log(`[agent-factory]   [${f.severity.toUpperCase()}] (${f.agent}/${f.category}) ${f.title}${f.location ? ` — ${f.location}` : ''} :: ${f.recommendation}`);
+  }
+  for (const s of report.syndication) {
+    console.log(`[agent-factory]   → ${s.target}: ${s.ok ? `delivered (${s.status})` : `NOT delivered (${s.error ?? s.status})`}`);
+  }
   return report;
 }
 

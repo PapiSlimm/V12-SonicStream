@@ -5,7 +5,7 @@ import { authenticateToken, AuthRequest } from '../identity/auth.js';
 import { config } from '../../config.js';
 import { AppError } from '../../middleware/error.js';
 import { db as firestore, isFirebaseAvailable } from '../../firebase-admin.js';
-import { isCatalogSku, resolveCatalogItem } from './catalog.js';
+import { isCatalogSku, resolveCatalogItem, listItems, listBeatLicenses, type MarketType } from './marketplace-catalog.js';
 
 /**
  * Marketplace sales checkout.
@@ -39,6 +39,19 @@ const checkoutSchema = z.object({
     .max(50),
 });
 
+// GET /api/sales/catalog?type=beat|service|ticket — live storefront items (public).
+router.get('/catalog', async (req, res) => {
+  const type = String(req.query.type || '') as MarketType;
+  const valid = ['beat', 'service', 'ticket'].includes(type);
+  const items = await listItems(valid ? type : undefined);
+  res.json({ items });
+});
+
+// GET /api/sales/beat-licenses — live license tiers for beat leasing (public).
+router.get('/beat-licenses', async (_req, res) => {
+  res.json({ licenses: await listBeatLicenses() });
+});
+
 // POST /api/sales/checkout
 router.post('/checkout', authenticateToken, async (req: AuthRequest, res) => {
   const { items } = checkoutSchema.parse(req.body);
@@ -53,9 +66,9 @@ router.post('/checkout', authenticateToken, async (req: AuthRequest, res) => {
   const purchased: Array<{ id: string; qty: number; cents: number }> = [];
 
   for (const [productId, quantity] of qtyById) {
-    // 1. Built-in catalog SKUs (beats / services / tickets) — price is authoritative here.
+    // 1. Catalog SKUs (beats / services / tickets) — price read live from the DB.
     if (isCatalogSku(productId)) {
-      const line = resolveCatalogItem(productId);
+      const line = await resolveCatalogItem(productId);
       if (!line) throw new AppError(`Item not found: ${productId}`, 404);
       line_items.push({
         quantity,

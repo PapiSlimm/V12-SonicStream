@@ -1,19 +1,23 @@
-import React, { useState } from 'react';
-import { 
-  Sparkles, DollarSign, ShieldAlert, Tv, FileText, 
-  CheckCircle2, Disc, Volume2, Search, 
-  Lock, Settings, SlidersHorizontal, ArrowDownToLine, 
+import React, { useState, useEffect } from 'react';
+import {
+  Sparkles, DollarSign, ShieldAlert, Tv, FileText,
+  CheckCircle2, Disc, Volume2, Search,
+  Lock, Settings, SlidersHorizontal, ArrowDownToLine,
   Check, Activity, TrendingUp, Percent, AlertTriangle, RefreshCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { apiFetch } from '../../../api/apiFetch';
 
-// --- STYLES & CONFIGS ---
-const LICENSES = [
-  { id: 'basic', name: 'Basic Lease', price: 19.99, format: 'MP3 Stereo', terms: 'Non-profit use, max 2,000 streams.' },
-  { id: 'premium', name: 'Premium Lease', price: 49.99, format: 'WAV + MP3', terms: 'Commercial use, max 10,000 streams.' },
-  { id: 'unlimited', name: 'Unlimited Lease', price: 149.99, format: 'WAV + Stem Files', terms: 'Unlimited streams, radio broadcasting allowed.' },
-  { id: 'exclusive', name: 'Exclusive Ownership', price: 499.99, format: 'All Formats + Complete Stems', terms: 'Full transfer of copyrights & ownership forever.' },
-];
+// Live marketplace data comes from /api/sales/* (real DB-backed catalog).
+// Maps the API shape to the fields these views render.
+const mapBeat = (i: any) => ({
+  id: i.id, title: i.title, producer: i.subtitle || i.sellerName || 'V12 Artist',
+  bpm: i.metadata?.bpm ?? 0, key: i.metadata?.key ?? '', mood: i.metadata?.mood ?? '',
+  genre: i.metadata?.genre ?? '', downloads: i.metadata?.downloads ?? 0,
+});
+const mapLicense = (l: any) => ({ id: l.id, name: l.name, price: (l.priceCents ?? 0) / 100, format: l.format, terms: l.terms });
+const mapService = (i: any) => ({ id: i.id, title: i.title, desc: i.description || i.subtitle || '', price: (i.priceCents ?? 0) / 100, delivery: i.metadata?.delivery ?? '', revisions: i.metadata?.revisions ?? '' });
+const mapTicket = (i: any) => ({ id: i.id, title: i.title, type: i.metadata?.type ?? 'Event', date: i.metadata?.date ?? '', venue: i.metadata?.venue ?? '', price: (i.priceCents ?? 0) / 100, genre: i.metadata?.genre ?? '' });
 
 export interface CreatorMarketplaceViewsProps {
   onAddToCart: (item: any) => void;
@@ -31,13 +35,28 @@ export const BeatLab: React.FC<CreatorMarketplaceViewsProps> = ({ onAddToCart })
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [selectedLicense, setSelectedLicense] = useState<string>('basic');
   const [purchasedBeat, setPurchasedBeat] = useState<any | null>(null);
+  const [mockBeats, setMockBeats] = useState<any[]>([]);
+  const [LICENSES, setLICENSES] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const mockBeats = [
-    { id: 'beat-1', title: 'Midnight Neon', producer: 'Aether Beats', bpm: 124, key: 'A Minor', mood: 'Dark', genre: 'Synthwave', downloads: 1420 },
-    { id: 'beat-2', title: 'Soul Drift', producer: 'Luna Vibe', bpm: 88, key: 'C Major', mood: 'Chill', genre: 'Lo-Fi', downloads: 932 },
-    { id: 'beat-3', title: 'Glitch Horizon', producer: 'Code Mute', bpm: 140, key: 'F# Minor', mood: 'Intense', genre: 'Cyberpunk', downloads: 2045 },
-    { id: 'beat-4', title: 'Ethereal Flow', producer: 'Aether Beats', bpm: 110, key: 'G Major', mood: 'Uplifting', genre: 'Trap', downloads: 812 },
-  ];
+  useEffect(() => {
+    (async () => {
+      try {
+        const [b, l] = await Promise.all([
+          apiFetch<{ items: any[] }>('/api/sales/catalog?type=beat'),
+          apiFetch<{ licenses: any[] }>('/api/sales/beat-licenses'),
+        ]);
+        setMockBeats((b.items || []).map(mapBeat));
+        const lic = (l.licenses || []).map(mapLicense);
+        setLICENSES(lic);
+        if (lic[0]) setSelectedLicense((prev) => (lic.some((x: any) => x.id === prev) ? prev : lic[0].id));
+      } catch {
+        toast.error('Could not load the beat catalog');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   const filteredBeats = mockBeats.filter(b => {
     const matchesSearch = b.title.toLowerCase().includes(search.toLowerCase()) || b.producer.toLowerCase().includes(search.toLowerCase());
@@ -331,11 +350,12 @@ export const ServicesHub: React.FC<CreatorMarketplaceViewsProps> = ({ onAddToCar
     { sender: 'creator', text: 'Hey and welcome! Please drop your audio stems and reference mixes of your track here to initiate mixing/mastering.' }
   ]);
 
-  const SERVICES = [
-    { id: 'svc-1', title: 'World-Class Mastering', price: 49.00, delivery: '2 Days', revisions: 3, desc: 'Professional audio rendering across fine analog desks. Mastered explicitly for Spotify, Apple Music, and clubs.' },
-    { id: 'svc-2', title: 'Elite Vocal Mixing', price: 125.00, delivery: '3 Days', revisions: 2, desc: 'Precision autotune curation, formant mapping, de-essing, and atmospheric spacing using high-end plug-ins.' },
-    { id: 'svc-3', title: 'Interactive Cyber Cover Art', price: 75.00, delivery: '24 Hours', revisions: 'Unlimited', desc: 'Sleek cyberpunk 3D models and brutalist custom layout typography optimized to look stunning at 3000x3000px.' },
-  ];
+  const [SERVICES, setSERVICES] = useState<any[]>([]);
+  useEffect(() => {
+    apiFetch<{ items: any[] }>('/api/sales/catalog?type=service')
+      .then((d) => setSERVICES((d.items || []).map(mapService)))
+      .catch(() => toast.error('Could not load creator services'));
+  }, []);
 
   const handleHireCreator = (srv: any) => {
     // Real checkout: add the server-priced service SKU to the cart.
@@ -608,11 +628,12 @@ export const ServicesHub: React.FC<CreatorMarketplaceViewsProps> = ({ onAddToCar
 export const TicketsCenter: React.FC<CreatorMarketplaceViewsProps> = ({ onAddToCart }) => {
   const [activeTicket, setActiveTicket] = useState<any | null>(null);
 
-  const CONCERTS = [
-    { id: 'tkt-1', title: 'SonicStream Genesis VR Live', date: 'July 18, 2026', type: 'Virtual Event', price: 9.99, genre: 'Electronic', venue: 'V12 Studio Metaverse 3' },
-    { id: 'tkt-2', title: 'Brutalist Club London (VIP)', date: 'August 11, 2026', type: 'Concert Tour', price: 49.99, genre: 'Dark Techno', venue: 'The Vault London' },
-    { id: 'tkt-3', title: 'Modular Synthesizer Grid Session', date: 'Sept 04, 2026', type: 'Interactive Seminar', price: 25.00, genre: 'Diy Synthesizer', venue: 'Zoom Custom Hub 12' }
-  ];
+  const [CONCERTS, setCONCERTS] = useState<any[]>([]);
+  useEffect(() => {
+    apiFetch<{ items: any[] }>('/api/sales/catalog?type=ticket')
+      .then((d) => setCONCERTS((d.items || []).map(mapTicket)))
+      .catch(() => toast.error('Could not load events'));
+  }, []);
 
   const handleBuyPass = (concert: any) => {
     // Real checkout: add the server-priced ticket SKU to the cart.
