@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import pino from 'pino';
 import { serverErrors } from '../monitoring/metrics.js';
+import { captureError } from '../agents/AgentFactory.js';
 
 const logger = pino();
 
@@ -29,6 +30,9 @@ export const errorHandler = (err: any, req: Request, res: Response, next: NextFu
   } else {
     serverErrors.inc({ type: 'other' });
   }
+
+  // Feed the V12 Agent Factory's Debug agent with real runtime signals.
+  if (statusCode >= 500) captureError(err, { method: req.method, url: req.url });
 
   logger.error({
     err,

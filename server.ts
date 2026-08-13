@@ -56,6 +56,7 @@ import notificationsRouter from './server/domains/social/notifications.routes.js
 import paymentsRouter from './server/domains/finance/payments.routes.js';
 import royaltiesRouter from './server/domains/finance/royalties.routes.js';
 import salesRouter from './server/domains/finance/sales.routes.js';
+import agentFactoryRouter from './server/routes/agent-factory.js';
 
 // Routers (Events)
 import eventsRouter from './server/domains/events/events.routes.js';
@@ -466,6 +467,7 @@ function initRoutes(app: Express) {
   app.use('/api/legal', legalRouter);
   app.use('/api/marketplace', customRateLimit({ max: 60 }), marketplaceRouter);
   app.use('/api/sales', customRateLimit({ max: 60 }), salesRouter);
+  app.use('/api/agent-factory', customRateLimit({ max: 30 }), agentFactoryRouter);
   app.use('/api/tenants', customRateLimit({ max: 60 }), tenantRouter);
 
   // V12 Ecosystem interconnect: ping + SSO handoff (service-token auth,
@@ -1369,6 +1371,22 @@ async function startServer(): Promise<void> {
       initDB().then(() => logger.info('[API Startup] Asynchronous DB pool connected.')).catch(err => logger.error('[API Startup] Async DB failed:', err.message));
       import('./server/jobs.js').then(({ initRedis }) => initRedis()).then(() => logger.info('[API Startup] Asynchronous Redis pool connected.')).catch(err => logger.error('[API Startup] Async Redis failed:', err.message));
       initializeFirebase().then(() => logger.info('[API Startup] Asynchronous Firebase client online.')).catch(err => logger.error('[API Startup] Async Firebase failed:', err.message));
+    }
+
+    // V12 AI Agent Factory: one guarded initial scan after boot settles (DB/migrations
+    // up), syndicated to V12 OS + NEXION. Re-runnable on demand via /api/agent-factory/run.
+    // Never blocks startup.
+    if (role === 'all' || role === 'server' || role === 'api') {
+      setTimeout(() => {
+        void (async () => {
+          try {
+            const { runFactory } = await import('./server/agents/AgentFactory.js');
+            await runFactory();
+          } catch (err: any) {
+            logger.error('[Agent Factory] initial scan deferred/failed:', err?.message);
+          }
+        })();
+      }, 60_000);
     }
   });
 

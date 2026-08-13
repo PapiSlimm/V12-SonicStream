@@ -64,9 +64,9 @@ export const BeatLab: React.FC<CreatorMarketplaceViewsProps> = ({ onAddToCart })
       ]
     };
 
-    // Add to global shopping cart
+    // Add to global shopping cart (SKU is server-priced: beat:<beatId>:<licenseId>)
     onAddToCart({
-      id: beat.id,
+      id: `beat:${beat.id}:${selectedLicense}`,
       sellerId: 'aether-beats-1',
       name: `${beat.title} [${license?.name || 'Basic License'}]`,
       description: `Premium music beat key: ${beat.key}, speed: ${beat.bpm} BPM. Complete studio WAV raw stems and commercial licensing.`,
@@ -324,7 +324,7 @@ export const BeatLab: React.FC<CreatorMarketplaceViewsProps> = ({ onAddToCart })
 // -------------------------------------------------------------
 // 2. CREATOR SERVICE MARKETPLACE (ESCROW WORKSPACE)
 // -------------------------------------------------------------
-export const ServicesHub: React.FC<CreatorMarketplaceViewsProps> = () => {
+export const ServicesHub: React.FC<CreatorMarketplaceViewsProps> = ({ onAddToCart }) => {
   const [activeOrder, setActiveOrder] = useState<any | null>(null);
   const [messageText, setMessageText] = useState('');
   const [messages, setMessages] = useState<any[]>([
@@ -338,6 +338,18 @@ export const ServicesHub: React.FC<CreatorMarketplaceViewsProps> = () => {
   ];
 
   const handleHireCreator = (srv: any) => {
+    // Real checkout: add the server-priced service SKU to the cart.
+    onAddToCart({
+      id: `svc:${srv.id}`,
+      sellerId: 'v12-creator-services',
+      name: `Creator Service: ${srv.title}`,
+      description: srv.desc,
+      price: srv.price,
+      type: 'service',
+      imageUrl: 'https://picsum.photos/seed/service/400/400',
+      stock: 999,
+      status: 'active',
+    });
     setActiveOrder({
       id: `ord-svc-${Math.floor(Math.random() * 8000) + 1000}`,
       service: srv.title,
@@ -355,7 +367,7 @@ export const ServicesHub: React.FC<CreatorMarketplaceViewsProps> = () => {
       { sender: 'system', text: `🛡️ Security Ledger active via Stripe Connect escrow. Buyer deposited $${srv.price.toFixed(2)}. Creator cannot withdraw until files are delivered and approved.` },
       { sender: 'creator', text: 'Thank you for your order! I am excited to work on your music. What bpm and scale is your track in?' }
     ]);
-    toast.success(`Hired! Funds are held safely in Escrow.`);
+    toast.success(`Added to cart — open your cart to complete secure checkout.`);
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -593,7 +605,7 @@ export const ServicesHub: React.FC<CreatorMarketplaceViewsProps> = () => {
 // -------------------------------------------------------------
 // 3. TICKET EXPERIENCES (PHASE 5 QR CHECK-IN)
 // -------------------------------------------------------------
-export const TicketsCenter: React.FC<CreatorMarketplaceViewsProps> = () => {
+export const TicketsCenter: React.FC<CreatorMarketplaceViewsProps> = ({ onAddToCart }) => {
   const [activeTicket, setActiveTicket] = useState<any | null>(null);
 
   const CONCERTS = [
@@ -603,13 +615,25 @@ export const TicketsCenter: React.FC<CreatorMarketplaceViewsProps> = () => {
   ];
 
   const handleBuyPass = (concert: any) => {
+    // Real checkout: add the server-priced ticket SKU to the cart.
+    onAddToCart({
+      id: `tkt:${concert.id}`,
+      sellerId: 'v12-events',
+      name: `Ticket: ${concert.title}`,
+      description: `${concert.type} · ${concert.venue} · ${concert.date}`,
+      price: concert.price,
+      type: 'ticket',
+      imageUrl: 'https://picsum.photos/seed/ticket/400/400',
+      stock: 999,
+      status: 'active',
+    });
     setActiveTicket({
       ...concert,
       qrToken: `TKTVER-${Math.floor(Math.random() * 90000) + 10000}-SONIC-2026`,
       paxCount: 1,
       checkedIn: false
     });
-    toast.success(`Ticket bought successfully! QR Pass generated.`);
+    toast.success(`Added to cart — open your cart to complete secure checkout.`);
   };
 
   return (

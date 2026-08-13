@@ -5,6 +5,7 @@ import { authenticateToken, AuthRequest } from '../identity/auth.js';
 import { config } from '../../config.js';
 import { AppError } from '../../middleware/error.js';
 import { db as firestore, isFirebaseAvailable } from '../../firebase-admin.js';
+import { isCatalogSku, resolveCatalogItem } from './catalog.js';
 
 /**
  * Marketplace sales checkout.
@@ -42,10 +43,6 @@ const checkoutSchema = z.object({
 router.post('/checkout', authenticateToken, async (req: AuthRequest, res) => {
   const { items } = checkoutSchema.parse(req.body);
 
-  if (!isFirebaseAvailable || !firestore) {
-    throw new AppError('Marketplace storefront is temporarily unavailable', 503);
-  }
-
   // Merge duplicate productIds into a single quantity.
   const qtyById = new Map<string, number>();
   for (const it of items) {
@@ -56,6 +53,26 @@ router.post('/checkout', authenticateToken, async (req: AuthRequest, res) => {
   const purchased: Array<{ id: string; qty: number; cents: number }> = [];
 
   for (const [productId, quantity] of qtyById) {
+    // 1. Built-in catalog SKUs (beats / services / tickets) — price is authoritative here.
+    if (isCatalogSku(productId)) {
+      const line = resolveCatalogItem(productId);
+      if (!line) throw new AppError(`Item not found: ${productId}`, 404);
+      line_items.push({
+        quantity,
+        price_data: {
+          currency: 'usd',
+          unit_amount: line.unitAmountCents,
+          product_data: { name: line.name },
+        },
+      });
+      purchased.push({ id: productId, qty: quantity, cents: line.unitAmountCents });
+      continue;
+    }
+
+    // 2. Real, user-listed products live in Firestore — read the price from there.
+    if (!isFirebaseAvailable || !firestore) {
+      throw new AppError('Marketplace storefront is temporarily unavailable', 503);
+    }
     const snap = await firestore.collection('products').doc(productId).get();
     if (!snap.exists) throw new AppError(`Product not found: ${productId}`, 404);
 
