@@ -57,6 +57,7 @@ import paymentsRouter from './server/domains/finance/payments.routes.js';
 import royaltiesRouter from './server/domains/finance/royalties.routes.js';
 import salesRouter from './server/domains/finance/sales.routes.js';
 import agentFactoryRouter from './server/routes/agent-factory.js';
+import rmpmRouter from './server/routes/rmpm.js';
 
 // Routers (Events)
 import eventsRouter from './server/domains/events/events.routes.js';
@@ -112,7 +113,16 @@ function initApp(app: Express) {
   // V12 ecosystem feed intake — raw-body HMAC route, must precede the JSON
   // parser. Receives R.M.P.M marketing suggestions/campaign records and any
   // peer envelopes: GET /api/ecosystem/feed/inbox to review them.
-  app.use('/api/ecosystem/feed', createFeedIntake({ serviceId: 'sonicstream' }));
+  app.use('/api/ecosystem/feed', createFeedIntake({
+    serviceId: 'sonicstream',
+    // Capture marketing data RMPM sends back so the app can market & promote with it.
+    onEvent: async (env: any) => {
+      if (env?.source === 'rmpm' && typeof env?.type === 'string' && env.type.startsWith('marketing.')) {
+        const { recordInboundMarketing } = await import('./server/ecosystem/rmpm-client.js');
+        await recordInboundMarketing(env);
+      }
+    },
+  }));
 
   // Trust proxy for rate limiter
   app.set('trust proxy', 1);
@@ -468,6 +478,7 @@ function initRoutes(app: Express) {
   app.use('/api/marketplace', customRateLimit({ max: 60 }), marketplaceRouter);
   app.use('/api/sales', customRateLimit({ max: 60 }), salesRouter);
   app.use('/api/agent-factory', customRateLimit({ max: 30 }), agentFactoryRouter);
+  app.use('/api/rmpm', customRateLimit({ max: 30 }), rmpmRouter);
   app.use('/api/tenants', customRateLimit({ max: 60 }), tenantRouter);
 
   // V12 Ecosystem interconnect: ping + SSO handoff (service-token auth,
