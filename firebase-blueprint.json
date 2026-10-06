@@ -1,0 +1,599 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and account information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "userType": { "type": "string", "enum": ["listener", "artist", "admin", "creator", "business", "venue"] },
+        "subscriptionTier": { "type": "string", "enum": ["free", "star", "visionary", "pro"] },
+        "isPro": { "type": "boolean" },
+        "avatarUrl": { "type": "string" },
+        "bio": { "type": "string" },
+        "profileId": { "type": "string", "description": "Foreign key to Artist or other profile types" },
+        "stripeAccountId": { "type": "string" },
+        "stripeOnboardingComplete": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "userType"]
+    },
+    "Track": {
+      "title": "Track",
+      "description": "Music track metadata",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "artistName": { "type": "string" },
+        "artistId": { "type": "string" },
+        "albumId": { "type": "string", "description": "Foreign key to Album" },
+        "genre": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "coverUrl": { "type": "string" },
+        "duration": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "live", "rejected"] },
+        "uploaderId": { "type": "string" },
+        "externalIds": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "artistName", "fileUrl", "uploaderId"]
+    },
+    "Playlist": {
+      "title": "Playlist",
+      "description": "User-created playlist",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "coverUrl": { "type": "string" },
+        "trackIds": { "type": "array", "items": { "type": "string" } },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "trackIds"]
+    },
+    "Album": {
+      "title": "Album",
+      "description": "Artist album or EP",
+      "type": "object",
+      "properties": {
+        "artistId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "coverUrl": { "type": "string" },
+        "releaseDate": { "type": "string", "format": "date" },
+        "genre": { "type": "string" },
+        "type": { "type": "string", "enum": ["album", "ep", "single"] },
+        "trackIds": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["artistId", "title", "type", "trackIds"]
+    },
+    "PlayHistory": {
+      "title": "PlayHistory",
+      "description": "Record of a track being played",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "trackId": { "type": "string" },
+        "playedAt": { "type": "string", "format": "date-time" },
+        "durationPlayed": { "type": "number" }
+      },
+      "required": ["userId", "trackId", "playedAt"]
+    },
+    "Like": {
+      "title": "Like",
+      "description": "User like on a track, album, or playlist",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "targetId": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["track", "album", "playlist"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "targetId", "targetType"]
+    },
+    "Artist": {
+      "title": "Artist",
+      "description": "Detailed artist profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "genre": { "type": "string" },
+        "bio": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "bannerUrl": { "type": "string" },
+        "basePrice": { "type": "number" },
+        "isVerified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name"]
+    },
+    "SonicEvent": {
+      "title": "SonicEvent",
+      "description": "Event listing details",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "time": { "type": "string" },
+        "venue": { "type": "string" },
+        "city": { "type": "string" },
+        "price": { "type": "number" },
+        "ticketsAvailable": { "type": "number" },
+        "artistId": { "type": "string" },
+        "artistName": { "type": "string" },
+        "organizerId": { "type": "string" },
+        "imageUrl": { "type": "string" }
+      },
+      "required": ["title", "date", "time", "venue", "organizerId"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Artist booking record",
+      "type": "object",
+      "properties": {
+        "artistId": { "type": "string" },
+        "artistName": { "type": "string" },
+        "eventId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled"] },
+        "totalAmount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["artistId", "customerId", "startTime", "status"]
+    },
+    "Venue": {
+      "title": "Venue",
+      "description": "Venue profile and management",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "address": { "type": "string" },
+        "city": { "type": "string" },
+        "capacity": { "type": "number" },
+        "techRider": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "address", "city", "capacity", "ownerId"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Digital or physical product for sale",
+      "type": "object",
+      "properties": {
+        "sellerId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "type": { "type": "string", "enum": ["digital", "merch", "webinar", "digital_download", "membership"] },
+        "imageUrl": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "stock": { "type": "number" },
+        "isOfficial": { "type": "boolean", "description": "Whether the product is owned by V12 SonicStream" },
+        "brandName": { "type": "string" },
+        "fulfillmentMethod": { "type": "string", "enum": ["self", "centralized"] },
+        "externalFulfillmentService": { "type": "string", "description": "Amazon, eBay, etc." },
+        "status": { "type": "string", "enum": ["active", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["sellerId", "name", "price", "type", "status"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "Record of a product sale",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "buyerId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "completed", "failed", "refunded"] },
+        "stripeSessionId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["productId", "sellerId", "buyerId", "amount", "status"]
+    },
+    "CustomSite": {
+      "title": "CustomSite",
+      "description": "User-designed custom website configuration",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "subdomain": { "type": "string" },
+        "theme": { "type": "string" },
+        "layout": { "type": "string", "description": "JSON string of the site layout" },
+        "components": { "type": "array", "items": { "type": "object" } },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "subdomain", "status"]
+    },
+    "MasteringPreset": {
+      "title": "MasteringPreset",
+      "description": "User-saved custom mastering settings",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "profile": { "type": "string", "description": "Base profile ID (Warm, Balanced, etc)" },
+        "settings": { "type": "object", "description": "Custom adjustments (JSON string or map)" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "profile"]
+    },
+    "ArtistAnalytics": {
+      "title": "ArtistAnalytics",
+      "description": "Aggregated analytics for an artist",
+      "type": "object",
+      "properties": {
+        "artistId": { "type": "string" },
+        "totalStreams": { "type": "number" },
+        "monthlyListeners": { "type": "number" },
+        "revenue": {
+          "type": "object",
+          "properties": {
+            "total": { "type": "number" },
+            "artistShare": { "type": "number" },
+            "v12Share": { "type": "number" }
+          }
+        },
+        "dailyStreams": { "type": "array", "items": { "type": "object" } },
+        "weeklyStreams": { "type": "array", "items": { "type": "object" } },
+        "monthlyStreams": { "type": "array", "items": { "type": "object" } },
+        "revenueByPlatform": { "type": "array", "items": { "type": "object" } },
+        "demographics": { "type": "object" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["artistId", "totalStreams", "updatedAt"]
+    },
+    "VerificationRequest": {
+      "title": "VerificationRequest",
+      "description": "Artist verification request",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "idImageUrl": { "type": "string" },
+        "socialLinks": { "type": "object" },
+        "status": { "type": "string", "enum": ["pending", "verified", "rejected"] },
+        "adminNotes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "idImageUrl", "status", "createdAt"]
+    },
+    "ProAsset": {
+      "title": "ProAsset",
+      "description": "Professional assets for subscribers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["overlay", "transition", "sfx", "lut", "motion_graphic", "bg_music"] },
+        "category": { "type": "string" },
+        "preview_url": { "type": "string" },
+        "file_url": { "type": "string" },
+        "required_tier": { "type": "string", "enum": ["visionary", "pro"] },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "file_size": { "type": "number" },
+        "format": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "name", "description", "type", "category", "file_url", "required_tier", "created_at"]
+    },
+    "UserAgreement": {
+      "title": "UserAgreement",
+      "description": "User accepted Terms of Service record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "agreement_version": { "type": "string" },
+        "accepted_at": { "type": "string", "format": "date-time" },
+        "ip_address": { "type": "string" }
+      },
+      "required": ["user_id", "agreement_version", "accepted_at"]
+    },
+    "PrivacyConsent": {
+      "title": "PrivacyConsent",
+      "description": "Disclosure and privacy acknowledgement record",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "consent_version": { "type": "string" },
+        "accepted_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "consent_version", "accepted_at"]
+    },
+    "CookiePreference": {
+      "title": "CookiePreference",
+      "description": "Granular user cookie settings track",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "necessary": { "type": "boolean" },
+        "analytics": { "type": "boolean" },
+        "marketing": { "type": "boolean" },
+        "personalization": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["necessary", "analytics", "marketing", "personalization"]
+    },
+    "CreatorVerification": {
+      "title": "CreatorVerification",
+      "description": "ID Verification, KYC, address and tax documents",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "legalName": { "type": "string" },
+        "address": { "type": "string" },
+        "taxInformation": { "type": "string" },
+        "governmentIdUrl": { "type": "string" },
+        "verificationStatus": { "type": "string", "enum": ["unverified", "pending", "verified", "rejected"] },
+        "verificationProvider": { "type": "string" },
+        "verifiedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "legalName", "verificationStatus"]
+    },
+    "RiskEvent": {
+      "title": "RiskEvent",
+      "description": "AML risk, rapid withdrawals, or multiple account logs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "amount": { "type": "number" },
+        "riskType": { "type": "string" },
+        "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "flaggedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "riskType", "severity", "flaggedAt"]
+    },
+    "FinancialLedgerEntry": {
+      "title": "FinancialLedgerEntry",
+      "description": "Immutable auditing table of payouts, refunds or payments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "paymentId": { "type": "string" },
+        "payoutId": { "type": "string" },
+        "refundId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "type": { "type": "string", "enum": ["payment", "payout", "refund"] },
+        "recordedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "amount", "type", "recordedAt"]
+    },
+    "TaxProfile": {
+      "title": "TaxProfile",
+      "description": "Tax profile and W-8/W-9 registration profiles",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "taxId": { "type": "string" },
+        "reportingStatus": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "taxId", "reportingStatus"]
+    },
+    "AiRecommendationLog": {
+      "title": "AiRecommendationLog",
+      "description": "AI recommendation audit trail with prompt and parameters",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "creator_id": { "type": "string" },
+        "prompt": { "type": "string" },
+        "recommendation": { "type": "string" },
+        "confidence": { "type": "number" },
+        "model_version": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "creator_id", "prompt", "recommendation", "confidence", "model_version", "created_at"]
+    },
+    "ContentLicense": {
+      "title": "ContentLicense",
+      "description": "Music/templates content IP licenses track",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "contentId": { "type": "string" },
+        "contentType": { "type": "string" },
+        "licenseType": { "type": "string" },
+        "grantedTo": { "type": "string" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "contentId", "licenseType"]
+    },
+    "SafetyReport": {
+      "title": "SafetyReport",
+      "description": "Fraud, impersonation, harassment or spam report file",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "reportedUserId": { "type": "string" },
+        "reporterUserId": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "under_review", "action_taken", "dismissed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "reportedUserId", "reporterUserId", "reason", "status", "createdAt"]
+    },
+    "EmailConsent": {
+      "title": "EmailConsent",
+      "description": "Unsubscribe controls and dual opt-in email tracks",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "marketingConsent": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email", "marketingConsent"]
+    },
+    "LegalDocument": {
+      "title": "LegalDocument",
+      "description": "Version metadata details of platform policies",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["tos", "privacy", "cookie", "ai_policy", "creator_policy"] },
+        "version": { "type": "string" },
+        "published_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "type", "version", "published_at"]
+    },
+    "LastPlayedPosition": {
+      "title": "LastPlayedPosition",
+      "description": "User's synchronized video playback last-played position",
+      "type": "object",
+      "properties": {
+        "videoId": { "type": "string", "description": "ID of the video" },
+        "userId": { "type": "string", "description": "ID of the user who owns this last-played state" },
+        "position": { "type": "number", "description": "Video playback time in seconds" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp of the last update" }
+      },
+      "required": ["videoId", "userId", "position", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/tracks/{trackId}": {
+      "schema": "Track",
+      "description": "Global tracks catalog"
+    },
+    "/artists/{artistId}": {
+      "schema": "Artist",
+      "description": "Artist profiles"
+    },
+    "/events/{eventId}": {
+      "schema": "SonicEvent",
+      "description": "Event listings"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Booking records"
+    },
+    "/venues/{venueId}": {
+      "schema": "Venue",
+      "description": "Venue profiles"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Products for sale"
+    },
+    "/sales/{saleId}": {
+      "schema": "Sale",
+      "description": "Sales records"
+    },
+    "/custom_sites/{siteId}": {
+      "schema": "CustomSite",
+      "description": "Custom site configurations"
+    },
+    "/mastering_presets/{presetId}": {
+      "schema": "MasteringPreset",
+      "description": "User-saved mastering presets"
+    },
+    "/playlists/{playlistId}": {
+      "schema": "Playlist",
+      "description": "User-created playlists"
+    },
+    "/albums/{albumId}": {
+      "schema": "Album",
+      "description": "Artist albums"
+    },
+    "/play_history/{historyId}": {
+      "schema": "PlayHistory",
+      "description": "User play history"
+    },
+    "/likes/{likeId}": {
+      "schema": "Like",
+      "description": "User likes"
+    },
+    "/verification_requests/{requestId}": {
+      "schema": "VerificationRequest",
+      "description": "Artist verification requests"
+    },
+    "/artist_analytics/{analyticsId}": {
+      "schema": "ArtistAnalytics",
+      "description": "Artist analytics data"
+    },
+    "/pro_assets/{assetId}": {
+      "schema": "ProAsset",
+      "description": "Professional assets for subscribers"
+    },
+    "/user_agreements/{agreementId}": {
+      "schema": "UserAgreement",
+      "description": "Accepted terms history log"
+    },
+    "/privacy_consents/{consentId}": {
+      "schema": "PrivacyConsent",
+      "description": "Privacy declarations consents"
+    },
+    "/cookie_preferences/{prefId}": {
+      "schema": "CookiePreference",
+      "description": "Cookie preference tracking"
+    },
+    "/creator_verifications/{verificationId}": {
+      "schema": "CreatorVerification",
+      "description": "Compliance KYC profiles and tax profiles"
+    },
+    "/risk_events/{eventId}": {
+      "schema": "RiskEvent",
+      "description": "AML threat flags and risk event logs"
+    },
+    "/ledger_entries/{entryId}": {
+      "schema": "FinancialLedgerEntry",
+      "description": "Immutable ledger listings"
+    },
+    "/tax_profiles/{userId}": {
+      "schema": "TaxProfile",
+      "description": "Creator tax profiles"
+    },
+    "/ai_recommendations/{recId}": {
+      "schema": "AiRecommendationLog",
+      "description": "AI recommendation audit values"
+    },
+    "/content_licenses/{licenseId}": {
+      "schema": "ContentLicense",
+      "description": "Material intellectual property trackers"
+    },
+    "/reports/{reportId}": {
+      "schema": "SafetyReport",
+      "description": "Fraud and threat safety report logs"
+    },
+    "/email_consents/{consentId}": {
+      "schema": "EmailConsent",
+      "description": "Sender marketing subscriptions"
+    },
+    "/legal_documents/{docId}": {
+      "schema": "LegalDocument",
+      "description": "Versioned policies control documents"
+    },
+    "/last_played_positions/{positionId}": {
+      "schema": "LastPlayedPosition",
+      "description": "User's synchronized video playback last-played position across devices"
+    }
+  }
+}

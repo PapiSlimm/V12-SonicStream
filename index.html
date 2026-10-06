@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="canonical" href="https://sonicstream.io/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111827" />
+    <meta name="robots" content="index, follow" />
+    
+    <meta name="description" content="Build websites, sell products, manage bookings, launch memberships, sell tickets, grow your audience, and run your creator business from one platform." />
+    <meta name="keywords" content="creator business, website builder, creator marketplace, bookings, ticketing, fan CRM, memberships, affiliate program, AI marketing, commerce" />
+    <meta name="author" content="SonicStream Team" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sonicstream.io/" />
+    <meta property="og:site_name" content="SonicStream" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="SonicStream | The Business Operating System for All Creators" />
+    <meta property="og:description" content="Build websites, sell products, manage bookings, launch memberships, sell tickets, grow your audience, and run your creator business from one platform." />
+    <meta property="og:image" content="https://sonicstream.io/og-image.jpg" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://sonicstream.io/" />
+    <meta property="twitter:title" content="SonicStream | The Business Operating System for All Creators" />
+    <meta property="twitter:description" content="Build websites, sell products, manage bookings, launch memberships, sell tickets, grow your audience, and run your creator business from one platform." />
+    <meta property="twitter:image" content="https://sonicstream.io/og-image.jpg" />
+    <meta name="twitter:site" content="@SonicStream" />
+    <meta name="twitter:creator" content="@SonicStream" />
+
+    <!-- Preconnect performance hints -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- PWA Capabilities -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Structured Data (JSON-LD) for SEO schema mapping -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "SonicStream",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "description": "Creator business operating system."
+    }
+    </script>
+    
+    <title>SonicStream | The Business Operating System for All Creators</title>
+  </head>
+  <body>
+    <div id="root">
+      <!-- High-performance inline loading experience to prevent blank screens before client JS loads -->
+      <div id="sonicstream-initial-loader" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #05070c; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: system-ui, -apple-system, sans-serif; color: #f3f4f6; z-index: 99999; overflow: hidden; background: radial-gradient(circle at center, #0e1324 0%, #05070c 100%);">
+        <!-- Premium Nested Sonic Wave Logo -->
+        <div class="logo-container" style="position: relative; width: 80px; height: 80px; margin-bottom: 24px; display: flex; align-items: center; justify-content: center; transform: scale(0.9); opacity: 0; animation: logo-entrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;">
+          <!-- Spinning ambient outer ring -->
+          <div style="position: absolute; width: 70px; height: 70px; border: 2px solid rgba(139, 92, 246, 0.08); border-top: 2px solid #8b5cf6; border-radius: 50%; animation: spin-loader 1.4s linear infinite;"></div>
+          <!-- Reverse spinning middle ring -->
+          <div style="position: absolute; width: 50px; height: 50px; border: 2px solid rgba(192, 132, 252, 0.04); border-bottom: 2px solid #c084fc; border-radius: 50%; animation: spin-loader-reverse 1.8s linear infinite;"></div>
+          <!-- Pulse glowing center node -->
+          <div style="position: absolute; width: 24px; height: 24px; background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%); border-radius: 50%; box-shadow: 0 0 20px #8b5cf6; animation: center-pulse 2s ease-in-out infinite;"></div>
+        </div>
+        <!-- High-contrast Brand Title with text entrance and continuous ambient glow -->
+        <div style="font-size: 24px; font-weight: 800; letter-spacing: 0.08em; color: #ffffff; text-transform: uppercase; animation: text-entrance 1s cubic-bezier(0.16, 1, 0.3, 1) forwards, glow-pulse 3s ease-in-out infinite; opacity: 0;">SonicStream</div>
+        <!-- Adaptive Status Description with delayed stagger -->
+        <div style="font-size: 11px; color: #a78bfa; margin-top: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.18em; animation: status-entrance 1s ease-out 0.4s forwards; opacity: 0;">Initializing Creator Business OS...</div>
+        <style>
+          @keyframes spin-loader {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          @keyframes spin-loader-reverse {
+            0% { transform: rotate(360deg); }
+            100% { transform: rotate(0deg); }
+          }
+          @keyframes logo-entrance {
+            0% {
+              opacity: 0;
+              transform: scale(0.9);
+              filter: blur(8px);
+            }
+            100% {
+              opacity: 1;
+              transform: scale(1);
+              filter: blur(0);
+            }
+          }
+          @keyframes text-entrance {
+            0% {
+              opacity: 0;
+              transform: translateY(12px) scale(0.95);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+          @keyframes status-entrance {
+            0% {
+              opacity: 0;
+              transform: translateY(4px);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          @keyframes center-pulse {
+            0%, 100% {
+              transform: scale(0.9);
+              box-shadow: 0 0 15px rgba(139, 92, 246, 0.6);
+            }
+            50% {
+              transform: scale(1.1);
+              box-shadow: 0 0 25px rgba(139, 92, 246, 0.9);
+            }
+          }
+          @keyframes glow-pulse {
+            0%, 100% {
+              text-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+            }
+            50% {
+              text-shadow: 0 0 24px rgba(139, 92, 246, 0.8), 0 0 35px rgba(167, 139, 250, 0.5);
+            }
+          }
+        </style>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

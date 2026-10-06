@@ -1,0 +1,130 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ── Build & test ─────────────────────────────────────────────────────────────
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Guard against shadow .js/.ts files
+        # 2026-07: we found 22 stale .js files sitting next to their .ts source in server/,
+        # and esbuild silently bundled the STALE .js version in production instead of the
+        # real .ts source (verified). This step fails the build if that pattern ever returns.
+        run: |
+          SHADOWS=$(find server -name "*.js" -not -path "*/node_modules/*")
+          if [ -n "$SHADOWS" ]; then
+            echo "❌ Found .js file(s) shadowing a .ts source in server/. This previously caused"
+            echo "   production to silently run stale code instead of the real TypeScript source."
+            echo "$SHADOWS"
+            exit 1
+          fi
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        # Not run in CI before. Currently has a backlog of pre-existing errors (missing
+        # @types for three/hls.js/video.js/dashjs, and node16/nodenext extensionless
+        # relative imports) that need triage as a separate pass. Flip continue-on-error
+        # to false once that backlog is cleared, same as the plan for the Test step below.
+        run: npm run typecheck
+        continue-on-error: true
+
+      - name: Build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Test
+        # BLOCKING as of 2026-07: 62+ tests cover the finance (ledger/payouts/royalties)
+        # and identity (auth/RBAC/JWT) domains, plus music and events. A failing test
+        # must stop the deploy - these suites guard money movement and access control.
+        run: npm test
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  # ── Deploy to Cloud Run ───────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Cloud Run
+    needs: build-and-test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # needed for Workload Identity Federation
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          # Alternatively, use Workload Identity (no long-lived key needed):
+          # workload_identity_provider: projects/123/locations/global/workloadIdentityPools/...
+          # service_account: deploy-sa@your-project.iam.gserviceaccount.com
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ secrets.CLOUD_RUN_REGION }}-docker.pkg.dev --quiet
+
+      - name: Build & push Docker image
+        run: |
+          IMAGE="${{ secrets.CLOUD_RUN_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/sonicstream/app:${{ github.sha }}"
+          docker build \
+            --build-arg VITE_STRIPE_PUBLISHABLE_KEY="${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}" \
+            --tag "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ secrets.CLOUD_RUN_SERVICE }} \
+            --image "$IMAGE" \
+            --region ${{ secrets.CLOUD_RUN_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8080 \
+            --memory 1Gi \
+            --cpu 1 \
+            --min-instances 1 \
+            --max-instances 10 \
+            --concurrency 80 \
+            --timeout 60 \
+            --set-env-vars "NODE_ENV=production,DATABASE_URL=${{ secrets.DATABASE_URL }},REDIS_URL=${{ secrets.REDIS_URL }},STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }},STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }},JWT_SECRET=${{ secrets.JWT_SECRET }},APP_URL=${{ secrets.APP_URL }},FRONTEND_URL=${{ secrets.FRONTEND_URL }},GOOGLE_CLOUD_BUCKET=${{ secrets.GOOGLE_CLOUD_BUCKET }},GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json,GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},ENABLE_PAYMENTS=${{ secrets.ENABLE_PAYMENTS }}" \
+            --set-secrets "/app/firebase-service-account.json=FIREBASE_SERVICE_ACCOUNT:latest" \
+            --quiet
+
+      - name: Show service URL
+        run: |
+          gcloud run services describe ${{ secrets.CLOUD_RUN_SERVICE }} \
+            --region ${{ secrets.CLOUD_RUN_REGION }} \
+            --format 'value(status.url)'
