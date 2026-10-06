@@ -349,18 +349,32 @@ export async function runMigrations(): Promise<void> {
       PRAGMA table_info(tracks);
     `);
 
-    // Helper to add column if not exists in SQLite
+    // Helper to add column if not exists.
+    // 2026-10-06 FIX (Render prod): the old helper queried sqlite_master
+    // unconditionally — on Postgres that relation doesn't exist, the first call
+    // THREW, and the entire runMigrations aborted at this point, so every block
+    // after it (incl. #55/#56) never ran and the API 500'd on missing tables.
+    // PG path now uses native ADD COLUMN IF NOT EXISTS via execEach (which also
+    // translates DATETIME → TIMESTAMP and catches per-statement errors).
     const addColumnIfNotExists = async (table: string, column: string, type: string) => {
-      const tableExists = await (conn as any).get(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-        [table]
-      );
-      if (!tableExists) {
+      if (isPg || isMysql) {
+        await execEach(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${column} ${type}`);
         return;
       }
-      const info = await (conn as any).all(`PRAGMA table_info(${table})`);
-      if (!info.find((c: any) => c.name === column)) {
-        await execEach(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+      try {
+        const tableExists = await (conn as any).get(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+          [table]
+        );
+        if (!tableExists) {
+          return;
+        }
+        const info = await (conn as any).all(`PRAGMA table_info(${table})`);
+        if (!info.find((c: any) => c.name === column)) {
+          await execEach(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+        }
+      } catch (e: any) {
+        console.error(`[MigrationService] addColumnIfNotExists(${table}.${column}) failed:`, e?.message);
       }
     };
 
