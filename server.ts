@@ -42,6 +42,7 @@ import { initializeFirebase } from './server/services/firebase.js';
 
 // Routers (Identity)
 import userRouter from './server/domains/identity/user.routes.js';
+import sonicAuthRouter from './server/domains/identity/auth.routes.js';
 
 // Routers (Music)
 import tracksRouter from './server/domains/music/tracks.routes.js';
@@ -427,6 +428,10 @@ function initRoutes(app: Express) {
     });
   });
   app.use('/api/v2', apiV2);
+
+  // SONIC AUTH (2026-10-07): self-hosted email/password auth — replaces the
+  // suspended-GCP Firebase login as the platform's identity provider.
+  app.use('/api/auth', sonicAuthRouter);
 
   // Direct unique legacy endpoints fallback (maintains complete compatibility with existing client requests)
   app.use('/api/admin', adminRouter);

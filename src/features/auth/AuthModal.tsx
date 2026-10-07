@@ -1,15 +1,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
-import { auth, db } from '../../firebase';
 import { useSearchParams } from 'react-router-dom';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  GoogleAuthProvider, 
-  signInWithPopup 
-} from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+// 2026-10-07 — SONIC AUTH: login/signup now run against our own /api/auth
+// endpoints. Firebase (suspended GCP project) is no longer in the sign-in path.
+import * as sonicAuth from '../../lib/sonicAuth';
 import { cn } from '../../utils/cn';
 
 interface AuthModalProps {
@@ -33,23 +28,14 @@ export const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }: AuthModal
     setIsLoading(true);
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, formData.email, formData.password);
+        await sonicAuth.login(formData.email, formData.password);
       } else {
-        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-        const firebaseUser = userCredential.user;
-        
-        // Create user profile in Firestore
-        await setDoc(doc(db, 'users', firebaseUser.uid), {
-          uid: firebaseUser.uid,
-          email: formData.email,
-          name: formData.name,
-          userType: formData.userType,
-          isPro: false,
-          balance: 0,
-          emailVerified: false,
-          referralCode: referralCode || null,
-          createdAt: new Date().toISOString()
-        });
+        await sonicAuth.register(
+          formData.email,
+          formData.password,
+          formData.name,
+          formData.userType === 'listener' ? 'creator' : formData.userType
+        );
       }
       onClose();
     } catch (err: any) {
@@ -61,18 +47,7 @@ export const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }: AuthModal
   };
 
   const handleGoogleLogin = async () => {
-    setError('');
-    setIsLoading(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      onClose();
-    } catch (err: any) {
-      console.error('Google Auth error:', err);
-      setError(err.message || 'Google authentication failed');
-    } finally {
-      setIsLoading(false);
-    }
+    setError('Google sign-in is being upgraded — use email and password for now.');
   };
 
   if (!isOpen) return null;
@@ -135,37 +110,26 @@ export const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }: AuthModal
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-zinc-500 uppercase">I am a...</label>
-                  <div className="flex gap-4 p-1 bg-black border border-white/10 rounded-xl">
-                    <button 
-                      type="button"
-                      onClick={() => setFormData({...formData, userType: 'creator' as any})}
-                      className={cn(
-                        "flex-1 py-2 rounded-lg text-xs font-bold transition-all",
-                        formData.userType === 'creator' ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-white"
-                      )}
-                    >
-                      Creator
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setFormData({...formData, userType: 'artist' as any})}
-                      className={cn(
-                        "flex-1 py-2 rounded-lg text-xs font-bold transition-all",
-                        formData.userType === 'artist' ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-white"
-                      )}
-                    >
-                      Artist
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setFormData({...formData, userType: 'listener' as any})}
-                      className={cn(
-                        "flex-1 py-2 rounded-lg text-xs font-bold transition-all",
-                        formData.userType === 'listener' ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-white"
-                      )}
-                    >
-                      Organizer
-                    </button>
+                  <div className="grid grid-cols-3 gap-2 p-1 bg-black border border-white/10 rounded-xl">
+                    {([
+                      ['creator', 'Creator'],
+                      ['artist', 'Artist'],
+                      ['organizer', 'Organizer'],
+                      ['business', 'Business'],
+                      ['church', 'Church'],
+                    ] as const).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setFormData({...formData, userType: value as any})}
+                        className={cn(
+                          "py-2 rounded-lg text-xs font-bold transition-all",
+                          formData.userType === value ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-white"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </>

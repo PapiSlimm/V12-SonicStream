@@ -1,12 +1,11 @@
-import { auth } from '../firebase';
+import { getToken } from '../lib/sonicAuth';
 import { ApiError } from './apiError';
 
+// 2026-10-07 — SONIC AUTH: bearer token now comes from our own session store,
+// not Firebase (whose suspended GCP project made every request hang/503).
 const getAuthHeader = async (): Promise<Record<string, string>> => {
-  if (auth.currentUser) {
-    const token = await auth.currentUser.getIdToken();
-    return { 'Authorization': `Bearer ${token}` };
-  }
-  return {};
+  const token = getToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
 };
 
 /**

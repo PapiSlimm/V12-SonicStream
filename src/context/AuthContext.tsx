@@ -1,9 +1,14 @@
 /* eslint-disable react-refresh/only-export-components */
+/**
+ * 2026-10-07 — SONIC AUTH rewrite.
+ * This context previously booted on Firebase's onAuthStateChanged. The Firebase
+ * project is hosted in the suspended GCP account, so Google returns 503 and the
+ * listener never settled — every protected page looped on the loading screen.
+ * Sessions are now our own JWTs from /api/auth, verified against our server.
+ */
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
-import { auth } from '../firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { api } from '../api';
+import * as sonicAuth from '../lib/sonicAuth';
 
 interface AuthContextType {
   user: User | null;
@@ -29,48 +34,49 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Boot instantly from the cached session, then confirm against the server.
+  const [user, setUser] = useState<User | null>(() => sonicAuth.getStoredUser() as User | null);
+  const [token, setToken] = useState<string | null>(() => sonicAuth.getToken());
+  const [isLoading, setIsLoading] = useState<boolean>(!!sonicAuth.getToken());
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setIsLoading(true);
-      if (firebaseUser) {
-        try {
-          const idToken = await firebaseUser.getIdToken();
-          setToken(idToken);
-          
-          // Fetch user profile from backend API
-          // The backend will automatically sync/create the user if it doesn't exist
-          const profile = await api.user.getProfile();
-          setUser(profile);
-        } catch (error) {
-          console.error('Error fetching user profile:', error);
-          setUser(null);
-          setToken(null);
-        }
-      } else {
-        setUser(null);
-        setToken(null);
-      }
+    let cancelled = false;
+
+    // React to login/logout performed anywhere in the app.
+    const unsubscribe = sonicAuth.onAuthChange((u) => {
+      if (cancelled) return;
+      setUser(u as User | null);
+      setToken(sonicAuth.getToken());
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    // Validate any stored session against the server exactly once at boot.
+    (async () => {
+      try {
+        const u = await sonicAuth.fetchMe();
+        if (!cancelled) {
+          setUser(u as User | null);
+          setToken(sonicAuth.getToken());
+        }
+      } catch {
+        /* server unreachable — keep cached session so the app still renders */
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; unsubscribe(); };
   }, []);
 
   const logout = async () => {
-    await signOut(auth);
+    sonicAuth.logout();
   };
 
   const refreshUser = async () => {
-    if (!auth.currentUser) return;
     try {
-      const idToken = await auth.currentUser.getIdToken(true);
-      setToken(idToken);
-      const profile = await api.user.getProfile();
-      setUser(profile);
+      const u = await sonicAuth.fetchMe();
+      setUser(u as User | null);
+      setToken(sonicAuth.getToken());
     } catch (err) {
       console.error('Failed to refresh user', err);
     }
@@ -89,15 +95,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isPaid = isCreatorTier || isVisionary || isPro || isEnterprise || isAdmin;
   const isPremiumEventUser = user?.isPremiumEventUser || isAdmin;
 
-  const getIdToken = async (forceRefresh = false) => {
-    if (!auth.currentUser) return null;
-    const idToken = await auth.currentUser.getIdToken(forceRefresh);
-    setToken(idToken);
-    return idToken;
+  const getIdToken = async (_forceRefresh = false) => {
+    const t = sonicAuth.getToken();
+    setToken(t);
+    return t;
   };
 
   return (
-    <AuthContext.Provider value={{ 
+    <AuthContext.Provider value={{
       user, token, isLoading, logout, refreshUser, getIdToken,
       isAdmin, isArtist, isCreator, isBusiness, isVenue, isStar, isVisionary, isPro, isEnterprise, isCreatorTier, isPremiumEventUser, isPaid
     }}>

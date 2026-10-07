@@ -103,35 +103,50 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     } else if (token.startsWith('spotify:')) {
       decodedToken = await verifySpotifyToken(token.slice(8));
     } else {
-      // Strategy 1: Firebase Auth (Standard for Browser/Frontend)
-      if (token.length > 50) { // Firebase tokens are usually long
-         try {
-           const firebaseUser = await firebaseAuth.verifyIdToken(token);
-           decodedToken = { uid: firebaseUser.uid, email: firebaseUser.email || '' };
-         } catch (fbErr) {
-           // Fallback strategy: Test if it is a direct Google OAuth2 reference
-           try {
-             decodedToken = await verifyGoogleToken(token);
-           } catch {
-             throw fbErr; // Throw original Firebase verification error if Google direct check also fails
-           }
-         }
-      } 
-      // Strategy 2: Custom JWT (API Keys / Service tokens)
-      else {
+      // 2026-10-07 FIX: our own JWTs are checked FIRST (local signature verify,
+      // no network). The old order gated on token.length > 50 and sent every
+      // long token to Firebase — which made the platform's own JWT logins
+      // impossible and left auth dead when the Firebase project was suspended.
+      // Strategy 1: Platform JWT (SONIC AUTH — /api/auth login/register)
+      let jwtOk = false;
+      try {
         const payload = JWTService.verifyToken(token);
         decodedToken = { uid: payload.uid, email: payload.email };
+        jwtOk = true;
+      } catch { /* not one of ours — fall through */ }
+
+      if (!jwtOk) {
+        // Strategy 2: Firebase Auth (legacy browser sessions)
+        try {
+          const firebaseUser = await firebaseAuth.verifyIdToken(token);
+          decodedToken = { uid: firebaseUser.uid, email: firebaseUser.email || '' };
+        } catch (fbErr) {
+          // Strategy 3: direct Google OAuth2 access token
+          try {
+            decodedToken = await verifyGoogleToken(token);
+          } catch {
+            throw fbErr;
+          }
+        }
       }
     }
     
-    // Auto-sync user to local DB if they don't exist
-    let user = await get<User>('SELECT * FROM users WHERE id = ?', [decodedToken.uid]);
-    if (!user) {
-      await run(
-        'INSERT INTO users (id, email, name, user_type) VALUES (?, ?, ?, ?)',
-        [decodedToken.uid, decodedToken.email || '', 'User ' + decodedToken.uid.slice(0, 5), 'listener']
-      );
+    // Auto-sync user to local DB if they don't exist. This must NEVER turn a
+    // valid token into a 403 - wrap it so a DB hiccup degrades gracefully.
+    let user: User | undefined;
+    try {
       user = await get<User>('SELECT * FROM users WHERE id = ?', [decodedToken.uid]);
+      if (!user) {
+        const emailName = (decodedToken.email || '').split('@')[0] || ('User ' + decodedToken.uid.slice(0, 5));
+        await run(
+          `INSERT INTO users (id, email, name, user_type, is_pro, subscription_tier, email_verified)
+           VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
+          [decodedToken.uid, decodedToken.email || '', emailName, 'creator', false, 'free', true]
+        );
+        user = await get<User>('SELECT * FROM users WHERE id = ?', [decodedToken.uid]);
+      }
+    } catch (syncErr: any) {
+      console.error('[auth] local user-sync failed (token still valid, proceeding):', syncErr?.message);
     }
 
     const { roles, permissions } = getRBACDetails(user?.userType);
