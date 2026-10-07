@@ -1,4 +1,11 @@
-import { run, all, db, getDB } from '../db.js';
+import { run, all, db, getDB, isPostgres } from '../db.js';
+
+// 2026-10-07 FIX (Render prod): this file used SQLite-only SQL unconditionally —
+// AUTOINCREMENT in CREATE TABLE and datetime('now','-N minutes') — which threw
+// "syntax error at or near AUTOINCREMENT" on Postgres every refresh cycle.
+// Both are now dialect-aware.
+const minutesAgo = (mins: number): string =>
+  isPostgres() ? `NOW() - INTERVAL '${mins} minutes'` : `datetime('now', '-${mins} minutes')`;
 import { registry } from './ServiceRegistry.js';
 import { config } from '../config.js';
 import { GoogleGenAI } from "@google/genai";
@@ -23,14 +30,14 @@ export async function refreshRSSFeeds() {
     // Ensure rss_feeds table exists before we perform any operations on it
     await run(`
       CREATE TABLE IF NOT EXISTS rss_feeds (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id ${isPostgres() ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
         title TEXT,
         content TEXT,
         type TEXT,
         category TEXT,
         media_url TEXT,
         author_id TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -39,7 +46,7 @@ export async function refreshRSSFeeds() {
       SELECT r.*, u.name as artist_name 
       FROM releases r 
       JOIN users u ON r.user_id = u.id 
-      WHERE r.status = 'live' AND r.created_at > datetime('now', '-20 minutes')
+      WHERE r.status = 'live' AND r.created_at > ${minutesAgo(20)}
     `);
     
     for (const release of releases) {
@@ -56,7 +63,7 @@ export async function refreshRSSFeeds() {
 
     // 2. Recently uploaded videos
     const videos = await all<any>(`
-      SELECT * FROM tracks WHERE is_video = 1 AND created_at > datetime('now', '-20 minutes')
+      SELECT * FROM tracks WHERE is_video = 1 AND created_at > ${minutesAgo(20)}
     `);
     for (const video of videos) {
       const trackTitle = typeof video.title === 'string' ? video.title : 'Untitled Video';
@@ -76,7 +83,7 @@ export async function refreshRSSFeeds() {
     // Check if we already have sufficient entertainment news within the last 12 hours
     const countQuery = await all<{ count: number }>(`
       SELECT COUNT(*) as count FROM rss_feeds 
-      WHERE type = 'news' AND category = 'Entertainment News' AND created_at > datetime('now', '-12 hours')
+      WHERE type = 'news' AND category = 'Entertainment News' AND created_at > ${minutesAgo(720)}
     `);
     const currentEntNewsCount = countQuery[0]?.count || 0;
 

@@ -29,7 +29,7 @@ export class RecommendationEngine {
           item_id TEXT NOT NULL,
           item_type TEXT NOT NULL,
           action TEXT NOT NULL,
-          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+          timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `);
       logger.info('[RecommendationEngine] Bootstrap feedback loop storage successfully.');
