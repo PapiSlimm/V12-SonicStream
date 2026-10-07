@@ -1253,6 +1253,10 @@ async function initializeServices(): Promise<void> {
 
   // 3. Background Workers
   try {
+    // 2026-10-07 FIX: in role=all, Redis was never initialized before the
+    // in-process workers started, so BullMQ always fell back to mock mode
+    // even with REDIS_URL set. Connect Redis first; workers then run real.
+    await initRedis();
     await startWorkerInProcess();
   } catch (err: any) {
     logger.error('[Worker] Background workers startup error:', err.message);
