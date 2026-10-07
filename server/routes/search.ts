@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
   };
 
   if (!type || type === 'track') {
-    let sql = 'SELECT * FROM tracks WHERE status = "live"';
+    let sql = "SELECT * FROM tracks WHERE status = 'live'";
     const params: any[] = [];
     if (q) {
       sql += ' AND (title LIKE ? OR display_artist_name LIKE ? OR artist LIKE ?)';

@@ -9,8 +9,8 @@ router.get('/sitemap.xml', async (req, res) => {
     res.header('Content-Type', 'application/xml');
     
     const [tracks, artists] = await Promise.all([
-      all('SELECT id, created_at FROM tracks WHERE status = "live"'),
-      all('SELECT id, created_at FROM users WHERE user_type = "artist"')
+      all("SELECT id, created_at FROM tracks WHERE status = 'live'"),
+      all("SELECT id, created_at FROM users WHERE user_type = 'artist'")
     ]);
 
     const baseUrl = config.APP_URL || 'https://v12sonicstream.com';

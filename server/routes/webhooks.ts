@@ -106,7 +106,7 @@ async function handleCheckoutCompleted(session: any) {
       console.log(`[StripeWebhook] Subscription checkout completed for user: ${subUserId}`);
       
       const referral = await db.get(
-        'SELECT * FROM referrals WHERE referredUserId = ? AND status = "active"',
+        "SELECT * FROM referrals WHERE referredUserId = ? AND status = 'active'",
         [subUserId]
       );
       

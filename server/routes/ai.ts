@@ -177,7 +177,7 @@ router.post('/generate-playlist', authenticateToken, aiLimiter, async (req: Auth
   // 2. Query the database for matching tracks
   // In a real app, we'd use a more sophisticated search or vector DB
   // For this applet, we'll use a combination of genre and keyword matching
-  const allTracks = await all<any>('SELECT * FROM tracks WHERE status = "live" LIMIT 100');
+  const allTracks = await all<any>("SELECT * FROM tracks WHERE status = 'live' LIMIT 100");
   
   // Simple matching logic
   const scoredTracks = allTracks.map(track => {

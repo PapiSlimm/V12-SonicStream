@@ -50,7 +50,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   `, [userId]);
 
   // 2. Get all live tracks, artists, and events
-  const tracks = await all<Track>('SELECT id, title, artist, genre, mood, description FROM tracks WHERE status = "live"');
+  const tracks = await all<Track>("SELECT id, title, artist, genre, mood, description FROM tracks WHERE status = 'live'");
   const artists = await all<any>('SELECT id, name, genre, popularity FROM artists');
   const events = await all<any>('SELECT id, title, venue, city, genre FROM events WHERE date > CURRENT_TIMESTAMP');
   

@@ -28,16 +28,22 @@ const downloadFile = async (url: string, path: string) => {
 const runFFmpeg = (args: string[], timeoutMs: number = 300000) => {
   return new Promise((resolve, reject) => {
     const ffmpeg = spawn('ffmpeg', args);
-    
+
     const timeout = setTimeout(() => {
       ffmpeg.kill('SIGKILL');
       reject(new Error('FFmpeg process timed out'));
     }, timeoutMs);
 
+    // Keep the tail of stderr so a non-zero exit reports WHY, not just a code.
+    let errTail = '';
+    ffmpeg.stderr?.on('data', (d: Buffer) => {
+      errTail = (errTail + d.toString()).slice(-2000);
+    });
+
     ffmpeg.on('close', (code) => {
       clearTimeout(timeout);
       if (code === 0) resolve(true);
-      else reject(new Error(`FFmpeg exited with code ${code}`));
+      else reject(new Error(`FFmpeg exited with code ${code}: ${errTail.slice(-500)}`));
     });
 
     ffmpeg.on('error', (err) => {
@@ -45,6 +51,40 @@ const runFFmpeg = (args: string[], timeoutMs: number = 300000) => {
       reject(err);
     });
   });
+};
+
+/** Run ffmpeg and return full stderr (loudnorm prints its JSON report there). */
+const runFFmpegCapture = (args: string[], timeoutMs: number = 300000): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const ffmpeg = spawn('ffmpeg', args);
+    const timeout = setTimeout(() => { ffmpeg.kill('SIGKILL'); reject(new Error('FFmpeg process timed out')); }, timeoutMs);
+    let err = '';
+    ffmpeg.stderr?.on('data', (d: Buffer) => { err += d.toString(); });
+    ffmpeg.on('close', (code) => {
+      clearTimeout(timeout);
+      if (code === 0) resolve(err);
+      else reject(new Error(`FFmpeg exited with code ${code}: ${err.slice(-500)}`));
+    });
+    ffmpeg.on('error', (e) => { clearTimeout(timeout); reject(e); });
+  });
+};
+
+/** ffprobe duration in seconds (0 on failure — callers treat it as unknown). */
+const probeDuration = (file: string): Promise<number> => {
+  return new Promise((resolve) => {
+    const p = spawn('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]);
+    let out = '';
+    p.stdout?.on('data', (d: Buffer) => { out += d.toString(); });
+    p.on('close', () => resolve(Math.max(0, parseFloat(out.trim()) || 0)));
+    p.on('error', () => resolve(0));
+  });
+};
+
+/** Parse the JSON block loudnorm prints at the end of its analysis pass. */
+const parseLoudnorm = (stderr: string): Record<string, string> | null => {
+  const m = stderr.match(/\{[^{}]*"input_i"[\s\S]*?\}/);
+  if (!m) return null;
+  try { return JSON.parse(m[0]); } catch { return null; }
 };
 
 export let connection: IORedis | null = null;
@@ -284,43 +324,79 @@ export const processFFmpeg = async (job: Job) => {
 
     await job.updateProgress(30);
 
-    const hlsPath = path.join(tempOutputDir, 'playlist.m3u8');
-    const dashPath = path.join(tempOutputDir, 'manifest.mpd');
+    /* ──────────────────────────────────────────────────────────────────────
+     * SONIC MEDIA PIPELINE (2026-10-07 rewrite)
+     *
+     * Old pipeline: single-bitrate HLS with a bogus video profile flag on an
+     * audio file, a DASH pass that doubled CPU for a player that never used
+     * it, and zero loudness control.
+     *
+     * New pipeline (CPU-only, fits the 0.5-vCPU Render box):
+     *  1. ANALYZE   — ffprobe duration + loudnorm measurement pass (EBU R128)
+     *  2. MEZZANINE — one loudness-normalized WAV at -14 LUFS / -1 dBTP
+     *                 (the streaming-platform standard), encoded once so the
+     *                 ladder rungs stay sample-identical in timing
+     *  3. LADDER    — one ffmpeg run fans out 3 AAC rungs (256/128/64 kbps)
+     *                 into HLS variant playlists + an adaptive master playlist
+     *                 (playlist.m3u8 — same URL shape the player already uses)
+     *  4. PREVIEW   — 30 s MP3 with fade-in/out from the mezzanine
+     * DASH is intentionally dropped: /api/stream already answers .mpd with an
+     * honest 404 and the player falls back to HLS.
+     * ────────────────────────────────────────────────────────────────────── */
+    const mezzPath = path.join(tempOutputDir, 'mezz.wav');
     const previewPath = path.join(tempOutputDir, 'preview.mp3');
 
-    // Generate HLS
-    await runFFmpeg([
-      '-i', inputPath,
-      '-profile:v', 'baseline',
-      '-level', '3.0',
-      '-start_number', '0',
-      '-hls_time', '10',
-      '-hls_list_size', '0',
-      '-f', 'hls',
-      hlsPath
+    // 1. ANALYZE — measure loudness (and duration for the DB).
+    const durationSec = await probeDuration(inputPath);
+    const analysis = await runFFmpegCapture([
+      '-hide_banner', '-i', inputPath,
+      '-af', 'loudnorm=I=-14:TP=-1.0:LRA=11:print_format=json',
+      '-f', 'null', '-'
     ]);
+    const ln = parseLoudnorm(analysis);
+    await job.updateProgress(45);
 
+    // 2. MEZZANINE — apply the measured values (true two-pass loudnorm).
+    const loudnormFilter = ln
+      ? `loudnorm=I=-14:TP=-1.0:LRA=11:measured_I=${ln.input_i}:measured_TP=${ln.input_tp}:measured_LRA=${ln.input_lra}:measured_thresh=${ln.input_thresh}:offset=${ln.target_offset}:linear=true`
+      : 'loudnorm=I=-14:TP=-1.0:LRA=11'; // analysis failed — single-pass fallback
+    await runFFmpeg([
+      '-hide_banner', '-i', inputPath,
+      '-af', loudnormFilter,
+      '-ar', '44100', '-ac', '2', '-c:a', 'pcm_s16le',
+      mezzPath
+    ]);
     await job.updateProgress(60);
 
-    // Generate DASH
+    // 3. LADDER — one process, three rungs, adaptive master playlist.
     await runFFmpeg([
-      '-i', inputPath,
-      '-f', 'dash',
-      '-seg_duration', '10',
-      '-use_template', '1',
-      '-use_timeline', '1',
-      dashPath
+      '-hide_banner', '-i', mezzPath,
+      '-filter_complex', '[0:a]asplit=3[hi][mid][lo]',
+      '-map', '[hi]',  '-c:a:0', 'aac', '-b:a:0', '256k',
+      '-map', '[mid]', '-c:a:1', 'aac', '-b:a:1', '128k',
+      '-map', '[lo]',  '-c:a:2', 'aac', '-b:a:2', '64k',
+      '-f', 'hls',
+      '-var_stream_map', 'a:0,name:hi a:1,name:mid a:2,name:lo',
+      '-master_pl_name', 'playlist.m3u8',
+      '-hls_time', '6',
+      '-hls_list_size', '0',
+      '-hls_playlist_type', 'vod',
+      '-hls_segment_filename', path.join(tempOutputDir, 'seg_%v_%03d.ts'),
+      path.join(tempOutputDir, 'stream_%v.m3u8')
     ]);
-
     await job.updateProgress(80);
 
-    // Generate 30s Preview
+    // 4. PREVIEW — 30 s, fade in/out, from the normalized mezzanine.
     await runFFmpeg([
-      '-i', inputPath,
-      '-ss', '0',
-      '-t', '30',
+      '-hide_banner', '-i', mezzPath,
+      '-ss', '0', '-t', '30',
+      '-af', 'afade=t=in:st=0:d=1,afade=t=out:st=28:d=2',
+      '-c:a', 'libmp3lame', '-b:a', '128k',
       previewPath
     ]);
+
+    // The WAV mezzanine is an intermediate — never ship ~50 MB to storage.
+    try { fs.unlinkSync(mezzPath); } catch { /* ignore */ }
 
     // Move to final destination
     let streamUrl = '';
@@ -336,7 +412,6 @@ export const processFFmpeg = async (job: Job) => {
           const gcsDest = `streams/${trackId}/${file}`;
           const uploadedUrl = await uploadToGCS(localFile, gcsDest);
           if (file === 'playlist.m3u8') streamUrl = uploadedUrl;
-          else if (file === 'manifest.mpd') dashUrl = uploadedUrl;
           else if (file === 'preview.mp3') previewUrl = uploadedUrl;
         }
       } catch (err) {
@@ -350,7 +425,6 @@ export const processFFmpeg = async (job: Job) => {
           fs.copyFileSync(path.join(tempOutputDir, file), path.join(absoluteOutputDir, file));
         });
         streamUrl = `/${path.join(outputDir, 'playlist.m3u8')}`;
-        dashUrl = `/${path.join(outputDir, 'manifest.mpd')}`;
         previewUrl = `/${path.join(outputDir, 'preview.mp3')}`;
       }
     } else {
@@ -364,20 +438,22 @@ export const processFFmpeg = async (job: Job) => {
       });
       
       streamUrl = `/${path.join(outputDir, 'playlist.m3u8')}`;
-      dashUrl = `/${path.join(outputDir, 'manifest.mpd')}`;
       previewUrl = `/${path.join(outputDir, 'preview.mp3')}`;
     }
 
     await job.updateProgress(100);
 
     logger.info(`Track ${trackId} processed successfully`);
+    // NOTE: double-quoted "live" was a latent Postgres bug (PG reads double
+    // quotes as a COLUMN name) — parameterized now. hls_url is what the
+    // /api/stream route redirects to; duration feeds the fallback playlist.
     await run(
-      'UPDATE tracks SET status = "live", stream_url = ?, dash_url = ?, preview_url = ? WHERE id = ?', 
-      [streamUrl, dashUrl, previewUrl, trackId]
+      'UPDATE tracks SET status = ?, stream_url = ?, hls_url = ?, dash_url = ?, preview_url = ?, duration = ? WHERE id = ?',
+      ['live', streamUrl, streamUrl, dashUrl || null, previewUrl, durationSec || null, trackId]
     );
   } catch (error) {
     logger.error(`FFmpeg processing failed for track ${trackId}:`, error);
-    await run('UPDATE tracks SET status = "error" WHERE id = ?', [trackId]);
+    await run('UPDATE tracks SET status = ? WHERE id = ?', ['error', trackId]);
     throw error;
   } finally {
     // Cleanup
@@ -418,11 +494,11 @@ export const processMastering = async (job: { data: any, id?: string }) => {
       dbFileUrl = `/${outputPath.replace(/\\/g, '/')}`;
     }
 
-    await run('UPDATE tracks SET file_url = ?, status = "live" WHERE id = ?', [dbFileUrl, trackId]);
+    await run("UPDATE tracks SET file_url = ?, status = 'live' WHERE id = ?", [dbFileUrl, trackId]);
     logger.info(`Track ${trackId} mastered successfully`);
   } catch (error) {
     logger.error(`Mastering failed for track ${trackId}:`, error);
-    await run('UPDATE tracks SET status = "error" WHERE id = ?', [trackId]);
+    await run("UPDATE tracks SET status = 'error' WHERE id = ?", [trackId]);
     throw error;
   }
 };
@@ -437,12 +513,12 @@ export const processDistribution = async (job: { data: { releaseId: string }, id
     }
 
     // Update status to packaging
-    await db.run('UPDATE releases SET status = "VALIDATING" WHERE id = ?', [releaseId]);
-    await db.run('UPDATE releases SET status = "ERROR" WHERE id = ?', [releaseId]);
+    await db.run("UPDATE releases SET status = 'VALIDATING' WHERE id = ?", [releaseId]);
+    await db.run("UPDATE releases SET status = 'ERROR' WHERE id = ?", [releaseId]);
     throw new Error('Music distribution services are not supported at this time.');
   } catch (err) {
     logger.error(`[Distribution Worker Error] Failed to distribute release ${releaseId}:`, err);
-    await db.run('UPDATE releases SET status = "ERROR" WHERE id = ?', [releaseId]);
+    await db.run("UPDATE releases SET status = 'ERROR' WHERE id = ?", [releaseId]);
     throw err;
   }
 };

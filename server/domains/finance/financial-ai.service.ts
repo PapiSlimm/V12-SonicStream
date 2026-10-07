@@ -40,7 +40,7 @@ export class FinancialAIService {
 
     // 2. Refund Rate
     const refundStats = await db.get<{ total: number, refunds: number }>(
-      'SELECT COUNT(*) as total, SUM(CASE WHEN status = "failed" OR type = "refund" THEN 1 ELSE 0 END) as refunds FROM ledger_transactions WHERE user_id = ?',
+      "SELECT COUNT(*) as total, SUM(CASE WHEN status = 'failed' OR type = 'refund' THEN 1 ELSE 0 END) as refunds FROM ledger_transactions WHERE user_id = ?",
       [userId]
     );
     const refundRate = (refundStats?.total || 0) > 0 ? (refundStats!.refunds / refundStats!.total) : 0;

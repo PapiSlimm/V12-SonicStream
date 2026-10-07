@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Sparkles, Activity, Eye, Zap } from 'lucide-react';
+import { Sparkles, Activity, Eye, Zap, Box } from 'lucide-react';
+import { SonicVisualizer3D } from './SonicVisualizer3D';
 
 interface MusicStreamVisualizerProps {
   isPlaying: boolean;
   color?: string;
-  mode?: 'bars' | 'wave' | 'circle';
+  mode?: 'bars' | 'wave' | 'circle' | '3d';
 }
 
 export const MusicStreamVisualizer: React.FC<MusicStreamVisualizerProps> = ({
@@ -14,7 +15,7 @@ export const MusicStreamVisualizer: React.FC<MusicStreamVisualizerProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
-  const [visMode, setVisMode] = useState<'bars' | 'wave' | 'circle'>(initialMode);
+  const [visMode, setVisMode] = useState<'bars' | 'wave' | 'circle' | '3d'>(initialMode);
   
   // Keep references for Audio context to avoid garbage collection
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -107,15 +108,19 @@ export const MusicStreamVisualizer: React.FC<MusicStreamVisualizerProps> = ({
       resizeObserver.observe(canvas.parentElement);
     }
 
-    // High performance drawing loop
+    // High performance drawing loop.
+    // 2026-10-07 GC FIX: localDataArray was allocated EVERY FRAME (60 Uint8Array
+    // allocations/sec), causing garbage-collection stutter on mobile. It is now
+    // allocated once and only regrown if the analyser's bin count changes.
+    let localDataArray = new Uint8Array(analyserRef.current ? analyserRef.current.frequencyBinCount : 64);
     const renderFrame = () => {
       animationRef.current = requestAnimationFrame(renderFrame);
 
       const analyser = analyserRef.current;
       const dataArray = dataArrayRef.current;
-      
+
       const bufferLength = analyser ? analyser.frequencyBinCount : 64;
-      const localDataArray = new Uint8Array(bufferLength);
+      if (localDataArray.length !== bufferLength) localDataArray = new Uint8Array(bufferLength);
 
       if (analyser && dataArray && isPlaying) {
         analyser.getByteFrequencyData(dataArray);
@@ -263,10 +268,16 @@ export const MusicStreamVisualizer: React.FC<MusicStreamVisualizerProps> = ({
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center">
       {/* Visualizer Canvas */}
+      {visMode === '3d' ? (
+        <div className="w-full h-full rounded-[40px] overflow-hidden">
+          <SonicVisualizer3D isPlaying={isPlaying} color={color} />
+        </div>
+      ) : (
       <canvas 
         ref={canvasRef} 
         className="w-full h-full block rounded-[40px] pointer-events-none transition-opacity duration-500"
       />
+      )}
 
       {/* Floating Interactive Controls */}
       <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/5 shadow-lg z-10">
@@ -290,6 +301,13 @@ export const MusicStreamVisualizer: React.FC<MusicStreamVisualizerProps> = ({
           title="Circular Pulse"
         >
           <Eye size={12} />
+        </button>
+        <button
+          onClick={() => setVisMode('3d')}
+          className={`p-1.5 rounded-full transition-all ${visMode === '3d' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-white'}`}
+          title="3D Reactive Sphere"
+        >
+          <Box size={12} />
         </button>
       </div>
 

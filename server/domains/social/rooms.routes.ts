@@ -83,7 +83,7 @@ router.post('/:roomId/end', authenticateToken, async (req: AuthRequest, res) => 
   if (!room) throw new AppError('Room not found', 404);
   if (room.hostId !== req.user?.id) throw new AppError('Only host can end room', 403);
 
-  await run('UPDATE rooms SET status = "ended" WHERE id = ?', [roomId]);
+  await run("UPDATE rooms SET status = 'ended' WHERE id = ?", [roomId]);
   
   const io = (req.app as any).get('io');
   if (io) {
