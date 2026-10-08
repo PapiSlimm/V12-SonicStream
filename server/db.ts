@@ -21,6 +21,15 @@ function mapQueryPlaceholders(sql: string): string {
   return sql.replace(/\?/g, () => `$${paramIndex++}`);
 }
 
+// PG param coercion (2026-10-08): our schema uses INTEGER 0/1 flag columns
+// (SQLite heritage), but node-postgres sends a JS boolean as the literal
+// 'false'/'true', which PG rejects for integer columns
+// ("invalid input syntax for type integer"). This broke /api/auth/register
+// in production. Coerce booleans to 0/1 for every PG-bound parameter list.
+function pgParams(params: any[]): any[] {
+  return params.map(p => typeof p === 'boolean' ? (p ? 1 : 0) : p);
+}
+
 export async function initDB(): Promise<any> {
   if (isConnected && db) return db;
   
@@ -224,7 +233,7 @@ export async function run(sql: string, params: any[] = []): Promise<any> {
   const dbInstance = await ensureDB();
   if (isPg) {
     const pgSql = mapQueryPlaceholders(sql);
-    const result = await dbInstance.query(pgSql, params);
+    const result = await dbInstance.query(pgSql, pgParams(params));
     return {
       lastID: result.rows?.[0]?.id || null,
       changes: result.rowCount || 0
@@ -241,7 +250,7 @@ export async function getOne<T = any>(sql: string, params: any[] = []): Promise<
   const dbInstance = await ensureDB();
   if (isPg) {
     const pgSql = mapQueryPlaceholders(sql);
-    const result = await dbInstance.query(pgSql, params);
+    const result = await dbInstance.query(pgSql, pgParams(params));
     return snakeToCamel(result.rows[0]) as T | undefined;
   }
   const result = await dbInstance.get(sql, params);
@@ -252,7 +261,7 @@ export async function getAll<T = any>(sql: string, params: any[] = []): Promise<
   const dbInstance = await ensureDB();
   if (isPg) {
     const pgSql = mapQueryPlaceholders(sql);
-    const result = await dbInstance.query(pgSql, params);
+    const result = await dbInstance.query(pgSql, pgParams(params));
     return snakeToCamel(result.rows) as T[];
   }
   const result = await dbInstance.all(sql, params);
@@ -295,17 +304,17 @@ export async function transaction<T>(callback: (tx: any) => Promise<T>): Promise
         },
         get: async <U>(sql: string, params: any[] = []): Promise<U | undefined> => {
           const pgSql = mapQueryPlaceholders(sql);
-          const r = await client.query(pgSql, params);
+          const r = await client.query(pgSql, pgParams(params));
           return snakeToCamel(r.rows[0]) as U | undefined;
         },
         all: async <U>(sql: string, params: any[] = []): Promise<U[]> => {
           const pgSql = mapQueryPlaceholders(sql);
-          const r = await client.query(pgSql, params);
+          const r = await client.query(pgSql, pgParams(params));
           return snakeToCamel(r.rows) as U[];
         },
         run: async (sql: string, params: any[] = []) => {
           const pgSql = mapQueryPlaceholders(sql);
-          const r = await client.query(pgSql, params);
+          const r = await client.query(pgSql, pgParams(params));
           return {
             lastID: r.rows?.[0]?.id || null,
             changes: r.rowCount || 0
