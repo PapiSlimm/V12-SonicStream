@@ -13,7 +13,7 @@ export const MarketingGuides = () => {
   const topics = [
     { id: 'how-to-release-music', title: 'How to Release Music Independently', icon: Zap },
     { id: 'get-booked-as-artist', title: 'How to Get Booked for Live Events', icon: Target },
-    { id: 'music-distribution-guide', title: 'The Ultimate Music Distribution Guide', icon: Star },
+    { id: 'music-distribution-guide', title: 'The Ultimate Creator Commerce Guide', icon: Star },
     { id: 'grow-fanbase-2026', title: 'Grow Your Fanbase in 2026', icon: BookOpen }
   ];
 

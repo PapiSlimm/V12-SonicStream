@@ -19,7 +19,7 @@ export const ContentRoadmap = () => {
       icon: Rocket,
       color: "purple",
       items: [
-        "Global Distribution: Automated delivery to Spotify, Apple Music, and other global stores.",
+        "Creator Economy Engine: Automated delivery to Spotify, Apple Music, and other global stores.",
         "Monetization: Flexible pricing models for tracks and physical merchandise.",
         "AI-Powered Insights: Mood analysis, BPM detection, and smart recommendations.",
         "Community Building: Follow systems and social sharing integrations."

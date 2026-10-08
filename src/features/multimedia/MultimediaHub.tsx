@@ -134,7 +134,7 @@ export const MultimediaHub: React.FC = () => {
             Multimedia <span className="text-emerald-500 italic">Hub</span>
           </h2>
           <p className="text-zinc-400 max-w-xl text-lg font-medium leading-relaxed">
-            Your centralized command center for all creative assets. Stream, manage, and distribute your content globally with precision.
+            Your centralized command center for all creative assets. Stream, manage, and sell your content worldwide with precision.
           </p>
         </div>
 

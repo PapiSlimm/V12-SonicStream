@@ -48,7 +48,7 @@ const CatalogManager = () => {
   ];
 
   const handleDistribute = async () => {
-    toast.error('Music distribution services are currently disabled.');
+    toast.error('Creator commerce services are currently disabled.');
     setSelectedTrackForDistribution(null);
   };
 
@@ -177,7 +177,7 @@ const CatalogManager = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black text-white mb-2">V12 SonicStream Catalog</h1>
-          <p className="text-zinc-400">Manage your releases, metadata, and global distribution.</p>
+          <p className="text-zinc-400">Manage your releases, metadata, and your creator economy.</p>
         </div>
         <button 
           onClick={() => setShowNewRelease(true)}
@@ -344,7 +344,7 @@ const CatalogManager = () => {
                 disabled={isUploading || !uploadFile}
                 className="w-full h-16 bg-zinc-700 text-white font-black text-xl rounded-3xl hover:bg-zinc-600 transition-all disabled:opacity-50"
               >
-                {isUploading ? 'Uploading...' : 'Submit for Distribution'}
+                {isUploading ? 'Uploading...' : 'Publish Release'}
               </button>
             </div>
           </div>
@@ -446,7 +446,7 @@ const CatalogManager = () => {
                     <button 
                       onClick={() => setSelectedTrackForDistribution(release)}
                       className="p-3 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-black rounded-xl transition-all"
-                      title="Distribute"
+                      title="Publish"
                     >
                       <Globe size={20} />
                     </button>
@@ -499,7 +499,7 @@ const CatalogManager = () => {
                   <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
                     <Globe className="text-blue-500" size={20} />
                   </div>
-                  <h3 className="text-xl font-black text-white">Distribute Release</h3>
+                  <h3 className="text-xl font-black text-white">Publish Release</h3>
                 </div>
                 <button onClick={() => setSelectedTrackForDistribution(null)} className="text-zinc-500 hover:text-white">
                   <Plus className="rotate-45" size={24} />

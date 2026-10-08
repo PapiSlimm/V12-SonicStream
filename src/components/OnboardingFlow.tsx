@@ -153,7 +153,7 @@ export default function OnboardingFlow({ onFinish }: { onFinish: () => void }) {
               <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-4">
                 <Globe className="w-6 h-6 text-emerald-500" />
               </div>
-              <h3 className="font-black text-lg mb-2 uppercase tracking-tight">Global Distribution</h3>
+              <h3 className="font-black text-lg mb-2 uppercase tracking-tight">Creator Economy Engine</h3>
               <p className="text-sm text-zinc-500 font-medium">One-click release to 150+ streaming platforms</p>
             </div>
           </div>

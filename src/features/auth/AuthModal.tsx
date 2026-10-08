@@ -71,7 +71,7 @@ export const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }: AuthModal
         <div className="space-y-6">
           <div className="text-center space-y-2">
             <h3 className="text-2xl font-bold">{isLogin ? 'Welcome Back' : 'Join SonicStream'}</h3>
-            <p className="text-zinc-500 text-sm">{isLogin ? 'Access your distribution hub' : 'Start distributing your music globally'}</p>
+            <p className="text-zinc-500 text-sm">{isLogin ? 'Access your creator business hub' : 'Start building your creator economy'}</p>
           </div>
 
           <button 

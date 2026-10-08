@@ -89,10 +89,11 @@ router.get('/analytics', authenticateToken, requireArtist, async (req: AuthReque
       ageGroups: {},
       topCountries: []
     },
+    // 2026-10-08 REPOSITION: we are a Creator Economic OS, not a distributor.
+    // The old fabricated Spotify/Apple split is gone — only real on-platform
+    // plays are reported.
     platformDistribution: [
-      { name: 'Spotify', streams: Math.floor((streams?.total || 0) * 0.3) },
-      { name: 'Apple Music', streams: Math.floor((streams?.total || 0) * 0.2) },
-      { name: 'SonicStream', streams: Math.floor((streams?.total || 0) * 0.5) }
+      { name: 'SonicStream', streams: streams?.total || 0 }
     ]
   };
   res.json(analytics);

@@ -68,7 +68,7 @@ router.post('/distribution/releases/:id/distribute', authenticateToken, async (r
   const rel = await get<any>('SELECT * FROM releases WHERE id = ? AND user_id = ?', [req.params.id, uid(req)]);
   if (!rel) throw new AppError('Release not found', 404);
   await run("UPDATE releases SET status = 'SUBMITTED' WHERE id = ?", [req.params.id]);
-  res.json({ success: true, message: 'Release submitted for distribution' });
+  res.json({ success: true, message: 'Release published' });
 });
 router.post('/distribution/distribute', authenticateToken, async (req: AuthRequest, res) => {
   const { trackId, platforms } = req.body || {};
@@ -81,7 +81,9 @@ router.post('/distribution/distribute', authenticateToken, async (req: AuthReque
     "INSERT INTO releases (id, user_id, artist_id, title, type, status, genre) VALUES (?, ?, ?, ?, 'SINGLE', 'SUBMITTED', ?)",
     [relId, uid(req), track.artistId || uid(req), track.title, track.genre || null]
   );
-  res.json({ success: true, message: `Submitted "${track.title}" to ${(platforms || []).length || 'all'} platforms`, releaseId: relId });
+  // 2026-10-08 REPOSITION: no DSP delivery claims — a release goes live on the
+  // creator's own storefront and catalog, and we say exactly that.
+  res.json({ success: true, message: `"${track.title}" is published to your storefront and catalog`, releaseId: relId });
 });
 router.get('/distribution/smart-links', authenticateToken, async (req: AuthRequest, res) => {
   const rows = await all('SELECT * FROM smart_links WHERE user_id = ? ORDER BY created_at DESC', [uid(req)]);

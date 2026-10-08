@@ -43,7 +43,7 @@ export const AdminModeration = () => {
     <div className="space-y-8">
       <header className="space-y-1">
         <h2 className="text-3xl font-bold">Moderation Queue</h2>
-        <p className="text-zinc-500">Review and approve content for global distribution.</p>
+        <p className="text-zinc-500">Review and approve content for your creator economy.</p>
       </header>
 
       <div className="space-y-4">
@@ -75,7 +75,7 @@ export const AdminModeration = () => {
                   onClick={() => handleAction(t.id, 'approve')}
                   className="px-4 py-2 bg-zinc-700 text-white rounded-xl text-xs font-bold hover:bg-zinc-600 transition-all"
                 >
-                  Approve & Distribute
+                  Approve & Publish
                 </button>
               </div>
             </div>

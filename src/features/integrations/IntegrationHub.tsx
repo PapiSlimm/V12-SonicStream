@@ -121,7 +121,7 @@ export const IntegrationHub = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
         <IntegrationCard 
-          title="Music Distribution"
+          title="Creator Commerce"
           icon={Share2}
           services={connections.distribution}
           onConnect={handleConnect}

@@ -68,7 +68,7 @@ export const SupportCenter = () => {
     {
       title: "Distribution & stores",
       articles: [
-        "Global Distribution: Where Your Music Goes",
+        "Creator Economy Engine: Where Your Music Goes",
         "Managing Store-Specific Metadata",
         "Takedowns and Re-releases",
         "Understanding Streaming Platform Requirements",

@@ -82,7 +82,7 @@ export const ProductDemo = () => {
             whileInView={{ x: 0, opacity: 1 }}
             className="absolute -top-10 -right-10 p-6 bg-zinc-800 border border-white/10 rounded-3xl shadow-2xl hidden xl:block max-w-[240px]"
           >
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Distribution Hub</p>
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Commerce Hub</p>
             <div className="h-32 bg-black/40 rounded-2xl border border-white/5 p-4 space-y-3">
               <div className="h-2 bg-emerald-500/20 rounded-full w-3/4" />
               <div className="h-2 bg-emerald-500/20 rounded-full w-1/2" />

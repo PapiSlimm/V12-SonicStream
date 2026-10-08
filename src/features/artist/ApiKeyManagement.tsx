@@ -22,7 +22,7 @@ export const ApiKeyManagement: React.FC = () => {
   const [keys, setKeys] = useState<APIKey[]>([
     { 
       id: '1', 
-      name: 'Global Distribution Sync', 
+      name: 'Creator Economy Engine Sync', 
       hashedKey: '$2b$12$ExampleHashedKeyRepresentationForSecurity', 
       lastFour: '8j92', 
       key: 'sk_live_51N...8j92', 

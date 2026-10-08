@@ -6,7 +6,7 @@ const adCategories = [
   { type: 'pro', title: 'Go Pro Unlimited', desc: 'Unlimited uploads & 80/20 splits', icon: Zap, color: 'from-emerald-500 to-emerald-600' },
   { type: 'marketing', title: 'TikTok Campaign', desc: 'Boost your reach by 400%', icon: TrendingUp, color: 'from-purple-600 to-pink-600' },
   { type: 'payout', title: 'Instant Payouts', desc: 'Get paid within 24 hours', icon: DollarSign, color: 'from-blue-500 to-indigo-600' },
-  { type: 'distribution', title: 'Global Distribution', desc: '150+ platforms in 1-click', icon: Music, color: 'from-orange-500 to-red-500' }
+  { type: 'distribution', title: 'Creator Economy Engine', desc: '150+ platforms in 1-click', icon: Music, color: 'from-orange-500 to-red-500' }
 ];
 
 export const AIAdBanners = () => {

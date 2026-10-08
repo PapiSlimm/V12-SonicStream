@@ -14,7 +14,7 @@ export class DistributionService {
     }
     return { 
       success: false, 
-      error: 'Music distribution services are currently disabled and not provided at this time.' 
+      error: 'Creator commerce services are currently disabled and not provided at this time.' 
     };
   }
 
@@ -22,7 +22,7 @@ export class DistributionService {
     if (release) {
       // release ignored
     }
-    return { success: false, message: 'Music distribution services are currently disabled.' };
+    return { success: false, message: 'Creator commerce services are currently disabled.' };
   }
 
   static validateReleaseForDistribution(release: any) {

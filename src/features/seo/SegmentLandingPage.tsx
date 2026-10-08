@@ -31,7 +31,7 @@ interface SegmentContent {
 const SEGMENTS: Record<string, SegmentContent> = {
   artists: {
     title: "SonicStream for Independent Artists",
-    tagline: "Distribute your music, sell your stems, and connect directly with your fanbase.",
+    tagline: "Sell your music, sell your stems, and connect directly with your fanbase.",
     description: "Launch your own custom artist portal. Sell merchandise, ticketed virtual listening sessions, stem packages, and exclusive access without middleman platforms capping your success.",
     primaryMetric: { value: "3.2x", label: "Average Income Increase vs. Traditional Streaming" },
     metrics: [

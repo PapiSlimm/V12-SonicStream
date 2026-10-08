@@ -21,7 +21,7 @@ export const SuccessStep = ({ onFinish }: SuccessStepProps) => {
           Profile Live!
         </h2>
         <p className="text-xl text-zinc-400 max-w-sm mx-auto">
-          Welcome to the future of music distribution. Your journey starts now.
+          Welcome to the future of creator commerce. Your journey starts now.
         </p>
       </div>
       

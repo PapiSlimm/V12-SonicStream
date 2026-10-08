@@ -204,7 +204,7 @@ export const HelpCenter: React.FC = () => {
           />
           <FeatureCard 
             icon={<Music className="text-blue-400" />}
-            title="Distribution Hub"
+            title="Commerce Hub"
             description="Global distribution to 150+ stores with industry-standard metadata and 70/30 split."
           />
           <FeatureCard 

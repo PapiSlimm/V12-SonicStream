@@ -263,7 +263,7 @@ export const VideoUploadForm = () => {
           disabled={!formData.video_file || !formData.thumbnail}
           className="bg-gradient-to-r from-emerald-500 to-purple-500 text-white px-16 py-6 rounded-3xl font-black text-2xl shadow-2xl hover:shadow-black/50 transition-all disabled:opacity-50"
         >
-          🚀 Submit for Distribution
+          🚀 Publish Release
         </Button>
         <div className="text-xs text-zinc-500 mt-4">
           Video will be processed and distributed to Vevo, Spotify Video, Apple Music
