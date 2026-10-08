@@ -18,20 +18,7 @@ import {
   SupportTicket,
   ProAsset
 } from '../types';
-import { db, auth } from '../firebase';
-import { 
-  collection, 
-  doc, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  serverTimestamp 
-} from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../utils/firestore';
+// 2026-10-08: Firestore removed — every call below goes to our own server.
 
 export * from './apiError';
 export * from './apiFetch';
@@ -56,82 +43,22 @@ export const api = {
   
   search: {
     query: async (params: Record<string, string>) => {
-      const searchTerm = params.q?.toLowerCase() || '';
-      try {
-        const tracksSnap = await getDocs(collection(db, 'tracks'));
-        const artistsSnap = await getDocs(collection(db, 'artists'));
-        const eventsSnap = await getDocs(collection(db, 'events'));
-
-        const tracks = tracksSnap.docs
-          .map(d => ({ id: d.id, ...d.data() } as unknown as Track))
-          .filter(t => t.title.toLowerCase().includes(searchTerm) || 
-                       (t.displayArtistName || '').toLowerCase().includes(searchTerm));
-
-        const artists = artistsSnap.docs
-          .map(d => ({ id: d.id, ...d.data() } as unknown as Artist))
-          .filter(a => a.name.toLowerCase().includes(searchTerm));
-
-        const events = eventsSnap.docs
-          .map(d => ({ id: d.id, ...d.data() } as any))
-          .filter(e => e.title.toLowerCase().includes(searchTerm) || e.venue.toLowerCase().includes(searchTerm));
-
-        return { tracks, artists, events };
-      } catch (error) {
-        return handleFirestoreError(error, OperationType.LIST, 'search');
-      }
+      const qs = new URLSearchParams(params).toString();
+      return apiFetch<{ tracks: Track[]; artists: Artist[]; events: any[] }>(`/api/search?${qs}`);
     }
   },
 
   verification: {
-    submit: async (data: any) => {
-      if (!auth.currentUser) throw new Error('Not authenticated');
-      try {
-        const docRef = await addDoc(collection(db, 'verification_requests'), {
-          ...data,
-          userId: auth.currentUser.uid,
-          userName: auth.currentUser.displayName || 'Anonymous',
-          userEmail: auth.currentUser.email,
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-        
-        await updateDoc(doc(db, 'users', auth.currentUser.uid), {
-          verificationStatus: 'pending'
-        });
-
-        return { id: docRef.id, success: true };
-      } catch (error) {
-        return handleFirestoreError(error, OperationType.CREATE, 'verification_requests');
-      }
-    },
-    getRequests: async () => {
-      try {
-        const q = query(collection(db, 'verification_requests'), orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      } catch (error) {
-        return handleFirestoreError(error, OperationType.LIST, 'verification_requests');
-      }
-    },
-    updateStatus: async (requestId: string, userId: string, status: 'verified' | 'rejected', notes?: string) => {
-      try {
-        await updateDoc(doc(db, 'verification_requests', requestId), {
-          status,
-          adminNotes: notes,
-          updatedAt: new Date().toISOString()
-        });
-        
-        await updateDoc(doc(db, 'users', userId), {
-          verificationStatus: status,
-          isVerified: status === 'verified'
-        });
-
-        return { success: true };
-      } catch (error) {
-        return handleFirestoreError(error, OperationType.UPDATE, `verification_requests/${requestId}`);
-      }
-    }
+    submit: (data: any) => apiFetch<{ id: string; success: boolean }>('/api/verification', {
+      method: 'POST',
+      ...json(data)
+    }),
+    getRequests: () => apiFetch<any[]>('/api/verification/requests'),
+    updateStatus: (requestId: string, userId: string, status: 'verified' | 'rejected', notes?: string) =>
+      apiFetch<{ success: boolean }>(`/api/verification/requests/${requestId}/status`, {
+        method: 'POST',
+        ...json({ status, userId, notes })
+      })
   },
 
   support: {
@@ -168,55 +95,11 @@ export const api = {
   },
 
   events: {
-    getAll: async () => {
-      try {
-        const q = query(collection(db, 'events'), orderBy('date', 'asc'));
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      } catch (error) {
-        return handleFirestoreError(error, OperationType.LIST, 'events');
-      }
-    },
-    getMyEvents: async () => {
-      if (!auth.currentUser) throw new Error('Not authenticated');
-      try {
-        const q = query(collection(db, 'events'), where('artistId', '==', auth.currentUser.uid), orderBy('date', 'asc'));
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      } catch (error) {
-        return handleFirestoreError(error, OperationType.LIST, 'events/my');
-      }
-    },
-    create: async (event: any) => {
-      if (!auth.currentUser) throw new Error('Not authenticated');
-      try {
-        const docRef = await addDoc(collection(db, 'events'), {
-          ...event,
-          artistId: auth.currentUser.uid,
-          artist_name: auth.currentUser.displayName || 'Anonymous',
-          createdAt: serverTimestamp()
-        });
-        return { id: docRef.id, success: true };
-      } catch (error) {
-        return handleFirestoreError(error, OperationType.CREATE, 'events');
-      }
-    },
-    update: async (id: string, event: any) => {
-      try {
-        await updateDoc(doc(db, 'events', id), event);
-        return { success: true };
-      } catch (error) {
-        return handleFirestoreError(error, OperationType.UPDATE, `events/${id}`);
-      }
-    },
-    delete: async (id: string) => {
-      try {
-        await deleteDoc(doc(db, 'events', id));
-        return { success: true };
-      } catch (error) {
-        return handleFirestoreError(error, OperationType.DELETE, `events/${id}`);
-      }
-    }
+    getAll: () => apiFetch<any[]>('/api/events'),
+    getMyEvents: () => apiFetch<any[]>('/api/events/mine'),
+    create: (event: any) => apiFetch<any>('/api/events', { method: 'POST', ...json(event) }),
+    update: (id: string, event: any) => apiFetch<any>(`/api/events/${id}`, { method: 'PUT', ...json(event) }),
+    delete: (id: string) => apiFetch<{ success: boolean }>(`/api/events/${id}`, { method: 'DELETE' })
   },
 
   stats: {
@@ -338,17 +221,8 @@ export const api = {
   },
 
   public: {
-    getReleaseBySlug: async (slug: string) => {
-      try {
-        const q = query(collection(db, 'smart_links'), where('slug', '==', slug));
-        const snapshot = await getDocs(q);
-        if (snapshot.empty) throw new Error('Release not found');
-        const doc = snapshot.docs[0];
-        return { id: doc.id, ...doc.data() } as any;
-      } catch (error) {
-        return handleFirestoreError(error, OperationType.GET, `public/release/${slug}`);
-      }
-    }
+    getReleaseBySlug: (slug: string) =>
+      apiFetch<any>(`/api/distribution/smart-links/slug/${encodeURIComponent(slug)}`)
   },
 
   radio: {

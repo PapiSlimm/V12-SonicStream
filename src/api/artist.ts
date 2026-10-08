@@ -1,8 +1,6 @@
 import { apiFetch, json } from './apiFetch';
 import { Artist, Track, ArtistAnalytics, RoyaltyStatement, Payout, DeliveryJob } from '../types';
-import { db } from '../firebase';
-import { doc, updateDoc } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../utils/firestore';
+// 2026-10-08: Firestore removed — profile updates go through our own API.
 
 export const artistApi = {
   getAnalytics: () => apiFetch<ArtistAnalytics>('/api/artist/analytics'),
@@ -39,12 +37,13 @@ export const artistApi = {
       method: 'POST'
     });
   },
-  updateProfile: async (id: string, data: any) => {
-    try {
-      await updateDoc(doc(db, 'users', id), data);
-      return { success: true };
-    } catch (error) {
-      return handleFirestoreError(error, OperationType.UPDATE, `users/${id}`);
-    }
+  updateProfile: async (_id: string, data: any) => {
+    // Server enforces that you can only update YOUR OWN profile (the old
+    // Firestore write accepted any user id — that was also a security hole).
+    await apiFetch<{ success: boolean }>('/api/user/profile', {
+      method: 'PUT',
+      ...json(data)
+    });
+    return { success: true };
   }
 };

@@ -198,4 +198,96 @@ router.get('/stream/:trackId/index.mpd', async (req, res) => {
   res.status(404).json({ error: 'dash_not_available', message: 'DASH stream not generated for this track; the player falls back to HLS/direct audio.' });
 });
 
+/* ── /api/verification — moved off Firestore (2026-10-08) ──────────────── */
+router.post('/verification', authenticateToken, async (req: AuthRequest, res) => {
+  const { category, links, message } = req.body || {};
+  const user = await get<any>('SELECT name, email FROM users WHERE id = ?', [uid(req)]);
+  const r = await run(
+    `INSERT INTO verification_requests (user_id, user_name, user_email, category, links, message, status)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
+    [uid(req), user?.name || 'Anonymous', user?.email || '', category || null,
+     JSON.stringify(links || []), message || null]
+  );
+  await run("UPDATE users SET verification_status = 'pending' WHERE id = ?", [uid(req)]).catch(() => {});
+  res.json({ id: r.lastID, success: true });
+});
+router.get('/verification/requests', authenticateToken, async (_req, res) => {
+  const rows = await all('SELECT * FROM verification_requests ORDER BY created_at DESC').catch(() => []);
+  res.json(rows || []);
+});
+router.post('/verification/requests/:id/status', authenticateToken, async (req: AuthRequest, res) => {
+  const { status, userId, notes } = req.body || {};
+  if (!['verified', 'rejected'].includes(status)) throw new AppError('status must be verified|rejected', 400);
+  await run('UPDATE verification_requests SET status = ?, admin_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [status, notes || null, req.params.id]);
+  if (userId) {
+    await run('UPDATE users SET verification_status = ?, is_verified = ? WHERE id = ?',
+      [status, status === 'verified' ? 1 : 0, userId]).catch(() => {});
+  }
+  res.json({ success: true });
+});
+
+/* ── /api/products — general creator store, backed by bst_products ─────────
+ * (2026-10-08: the client store previously read/wrote a Firestore `products`
+ * collection on the suspended GCP project. Manually-created products now live
+ * on the same shelf the BST agents stock, created_by='creator'.) */
+router.get('/products', async (_req, res) => {
+  const rows = await all("SELECT * FROM bst_products WHERE status = 'published' ORDER BY created_at DESC LIMIT 200").catch(() => []);
+  res.json(rows || []);
+});
+router.get('/products/artist/:artistId', async (req, res) => {
+  const rows = await all("SELECT * FROM bst_products WHERE user_id = ? AND status = 'published' ORDER BY created_at DESC",
+    [req.params.artistId]).catch(() => []);
+  res.json(rows || []);
+});
+router.get('/products/:id', async (req, res) => {
+  const p = await get('SELECT * FROM bst_products WHERE id = ?', [req.params.id]);
+  if (!p) throw new AppError('Product not found', 404);
+  res.json(p);
+});
+router.post('/products', authenticateToken, async (req: AuthRequest, res) => {
+  const { name, title, description, price, kind, trackIds, imageUrl } = req.body || {};
+  const pname = String(name || title || '').slice(0, 200);
+  if (!pname) throw new AppError('name is required', 400);
+  const id = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  await run(
+    `INSERT INTO bst_products (id, user_id, kind, name, description, price, source, track_ids, status, created_by, published_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'published', 'creator', CURRENT_TIMESTAMP)`,
+    [id, uid(req), kind || 'digital', pname, description || null, Number(price) || 0,
+     imageUrl || null, JSON.stringify(trackIds || [])]
+  );
+  res.json({ id, success: true });
+});
+router.patch('/products/:id', authenticateToken, async (req: AuthRequest, res) => {
+  const p = await get<any>('SELECT * FROM bst_products WHERE id = ? AND user_id = ?', [req.params.id, uid(req)]);
+  if (!p) throw new AppError('Product not found', 404);
+  const { name, description, price, status, kind } = req.body || {};
+  await run('UPDATE bst_products SET name = ?, description = ?, price = ?, status = ?, kind = ? WHERE id = ?',
+    [name ?? p.name, description ?? p.description, price ?? p.price, status ?? p.status, kind ?? p.kind, req.params.id]);
+  res.json({ success: true });
+});
+router.delete('/products/:id', authenticateToken, async (req: AuthRequest, res) => {
+  const p = await get<any>('SELECT id FROM bst_products WHERE id = ? AND user_id = ?', [req.params.id, uid(req)]);
+  if (!p) throw new AppError('Product not found', 404);
+  await run('DELETE FROM bst_products WHERE id = ?', [req.params.id]);
+  res.json({ success: true });
+});
+
+/* ── /api/sales/mine — seller or buyer sales history ───────────────────── */
+router.get('/sales/mine', authenticateToken, async (req: AuthRequest, res) => {
+  const role = req.query.role === 'buyer' ? 'buyer_id' : 'seller_id';
+  const rows = await all(
+    `SELECT s.*, p.name as product_name FROM bst_sales s
+     LEFT JOIN bst_products p ON p.id = s.product_id
+     WHERE s.${role} = ? ORDER BY s.created_at DESC`, [uid(req)]).catch(() => []);
+  res.json(rows || []);
+});
+
+/* ── public smart-link lookup by slug (was a client Firestore query) ───── */
+router.get('/distribution/smart-links/slug/:slug', async (req, res) => {
+  const link = await get('SELECT * FROM smart_links WHERE slug = ?', [req.params.slug]);
+  if (!link) throw new AppError('Release not found', 404);
+  res.json(link);
+});
+
 export default router;

@@ -1494,6 +1494,39 @@ export async function runMigrations(): Promise<void> {
     await execEach(`ALTER TABLE artist_sites ADD COLUMN published INTEGER DEFAULT 0`).catch((e:any) => console.error("[MigrationService] block #56h failed:", e?.message));
     console.log('[MigrationService] Block #56 (Site Builder studio) applied.');
 
+  // ── Block #57 (2026-10-08): Firestore-removal support ──────────────────
+  // events gains the columns the rewritten DB-backed routes need, and
+  // verification_requests moves from Firestore into the shared DB.
+  {
+    // Plain ALTERs via execEach: duplicate-column errors are caught per
+    // statement (same idempotent pattern as blocks #55i/j) — and execEach is
+    // the only helper in scope here (addColumnIfNotExists is block-scoped
+    // inside the core-schema section above).
+    await execEach(`ALTER TABLE events ADD COLUMN organizer_id TEXT`);
+    await execEach(`ALTER TABLE events ADD COLUMN artist_name TEXT`);
+    await execEach(`ALTER TABLE events ADD COLUMN status TEXT DEFAULT 'upcoming'`);
+    await execEach(`ALTER TABLE events ADD COLUMN is_live INTEGER DEFAULT 0`);
+
+    await execEach(`
+      CREATE TABLE IF NOT EXISTS verification_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        user_name TEXT,
+        user_email TEXT,
+        category TEXT,
+        links TEXT,
+        message TEXT,
+        status TEXT DEFAULT 'pending',
+        admin_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch((e:any) => console.error('[MigrationService] block #57 failed:', e?.message));
+
+    await execEach(`ALTER TABLE users ADD COLUMN verification_status TEXT`);
+    console.log('[MigrationService] Block #57 (events columns + verification_requests) applied.');
+  }
+
     console.log('[MigrationService] Database schema migrations completed successfully.');
 }
 

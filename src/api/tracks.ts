@@ -1,33 +1,20 @@
 import { apiFetch, json } from './apiFetch';
 import { Track } from '../types';
-import { db } from '../firebase';
-import { doc, getDoc, updateDoc, collection, query, limit, startAfter, getDocs, orderBy } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../utils/firestore';
+// 2026-10-08: Firestore removed — pagination and play counts now hit our own API.
 
 export const tracksApi = {
   getAll: async () => {
     return apiFetch<Track[]>('/api/tracks');
   },
   getPaginated: async (pageSize: number = 20, lastDoc?: any) => {
-    try {
-      let q = query(
-        collection(db, 'tracks'), 
-        orderBy('createdAt', 'desc'), 
-        limit(pageSize)
-      );
-      
-      if (lastDoc) {
-        q = query(q, startAfter(lastDoc));
-      }
-      
-      const snapshot = await getDocs(q);
-      return {
-        items: snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Track)),
-        lastDoc: snapshot.docs[snapshot.docs.length - 1]
-      };
-    } catch (error) {
-      return handleFirestoreError(error, OperationType.LIST, 'tracks');
-    }
+    // lastDoc is a numeric offset cursor now (was a Firestore snapshot).
+    const offset = typeof lastDoc === 'number' ? lastDoc : 0;
+    const items = await apiFetch<Track[]>('/api/tracks');
+    const page = items.slice(offset, offset + pageSize);
+    return {
+      items: page,
+      lastDoc: offset + page.length < items.length ? offset + page.length : null
+    };
   },
   getArtistTracks: async (artistId?: string) => {
     const url = artistId ? `/api/tracks?artistId=${artistId}` : '/api/tracks';
@@ -72,12 +59,10 @@ export const tracksApi = {
   },
   incrementPlays: async (id: string) => {
     try {
-      const docRef = doc(db, 'tracks', id);
-      const trackDoc = await getDoc(docRef);
-      if (trackDoc.exists()) {
-        const currentPlays = trackDoc.data().plays || 0;
-        await updateDoc(docRef, { plays: currentPlays + 1 });
-      }
+      await apiFetch<{ success: boolean }>(`/api/tracks/${id}/play`, {
+        method: 'POST',
+        ...json({ duration: 0 })
+      });
       return { success: true };
     } catch (error) {
       console.error('Failed to increment plays', error);
