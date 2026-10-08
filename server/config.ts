@@ -13,6 +13,18 @@ if (fs.existsSync(envLocalPath)) {
   dotenv.config({ path: envPath });
 }
 
+// Normalize secrets pasted through dashboard UIs (2026-10-08): a trailing
+// newline/space on an API key makes Node reject the Authorization header
+// (ERR_INVALID_CHAR), which stripe-node surfaces as a misleading
+// "connection to Stripe" error. Trim whitespace from every credential-like
+// env var at startup, before anything reads process.env directly.
+for (const k of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PUBLISHABLE_KEY',
+  'GEMINI_API_KEY', 'OPENAI_API_KEY', 'REPLICATE_API_TOKEN', 'RUNWAY_API_KEY',
+  'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'R2_PUBLIC_URL',
+  'JWT_SECRET', 'JWT_REFRESH_SECRET', 'COOKIE_SECRET', 'DATABASE_URL', 'REDIS_URL']) {
+  if (typeof process.env[k] === 'string') process.env[k] = (process.env[k] as string).trim();
+}
+
 // Validate required variables
 function validateEnvVar(name: string, minLength: number = 1): string {
   const value = process.env[name];
