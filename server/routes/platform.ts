@@ -13,6 +13,7 @@ import { authenticateToken, AuthRequest } from '../domains/identity/auth.js';
 import { all, get, run } from '../db.js';
 import { AppError } from '../middleware/error.js';
 import { config } from '../config.js';
+import { getSignedUrl } from '../utils/storage.js';
 
 const router = Router();
 const uid = (req: AuthRequest) => req.user?.id;
@@ -163,10 +164,21 @@ router.post('/sales/checkout', authenticateToken, async (req: AuthRequest, res) 
   // trusted) and recorded as pending bst_sales rows. The webhook marks them
   // completed on payment. Vendor payouts are ledger-driven; swapping the
   // payout step for Stripe Connect transfers later won't touch this math.
-  const COMMISSION_RATE = Math.min(0.5, Math.max(0, Number(process.env.COMMISSION_RATE || 0.10)));
+  // Tiered by product type (2026-10-08): physical 5%, digital 15%, service
+  // 10% — each env-overridable; anything unrecognized falls back to the flat
+  // COMMISSION_RATE. Rates are clamped to [0, 50%].
+  const clamp = (v: any, dflt: number) => Math.min(0.5, Math.max(0, Number(v ?? dflt)));
+  const COMMISSION_RATE = clamp(process.env.COMMISSION_RATE, 0.10);
+  const TIER_RATES: Record<string, number> = {
+    physical: clamp(process.env.COMMISSION_PHYSICAL, 0.05),
+    digital: clamp(process.env.COMMISSION_DIGITAL, 0.15),
+    service: clamp(process.env.COMMISSION_SERVICE, 0.10),
+  };
+  const rateFor = (kind: string | null | undefined) =>
+    TIER_RATES[String(kind || '').toLowerCase()] ?? COMMISSION_RATE;
 
   const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
-  const resolved: { productId: string; sellerId: string | null; trackId: number | null; qty: number; unitCents: number }[] = [];
+  const resolved: { productId: string; sellerId: string | null; trackId: number | null; qty: number; unitCents: number; rate: number }[] = [];
   for (const it of items.slice(0, 20)) {
     const bst = await get<any>('SELECT * FROM bst_products WHERE id = ?', [it.productId]);
     const trk = bst ? null : await get<any>('SELECT id, artist_id, title as name, price FROM tracks WHERE id = ?', [it.productId]);
@@ -180,6 +192,7 @@ router.post('/sales/checkout', authenticateToken, async (req: AuthRequest, res) 
       trackId: trk ? Number(trk.id) : null,
       qty,
       unitCents,
+      rate: rateFor(bst ? bst.kind : 'digital'), // a track is a digital good
     });
     line_items.push({
       quantity: qty,
@@ -202,16 +215,70 @@ router.post('/sales/checkout', authenticateToken, async (req: AuthRequest, res) 
   // Pending commission rows, one per line item — finalized by the webhook.
   for (const r of resolved) {
     const grossUsd = (r.unitCents * r.qty) / 100;
-    const platformUsd = Math.round(grossUsd * COMMISSION_RATE * 100) / 100;
+    const platformUsd = Math.round(grossUsd * r.rate * 100) / 100;
     const sellerUsd = Math.round((grossUsd - platformUsd) * 100) / 100;
     await run(
       `INSERT INTO bst_sales (product_id, seller_id, buyer_id, track_id, amount, seller_revenue, platform_revenue, stripe_session_id, status, quantity, commission_rate)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-      [r.productId, r.sellerId, uid(req), r.trackId, grossUsd, sellerUsd, platformUsd, session.id, r.qty, COMMISSION_RATE]
+      [r.productId, r.sellerId, uid(req), r.trackId, grossUsd, sellerUsd, platformUsd, session.id, r.qty, r.rate]
     ).catch((e: any) => console.error('[checkout] failed to record pending sale:', e?.message));
   }
 
   res.json({ url: session.url });
+});
+
+/* ── /api/commission-rates — public, feeds the vendor earnings calculator ─ */
+router.get('/commission-rates', (_req, res) => {
+  const clamp = (v: any, dflt: number) => Math.min(0.5, Math.max(0, Number(v ?? dflt)));
+  res.json({
+    default: clamp(process.env.COMMISSION_RATE, 0.10),
+    physical: clamp(process.env.COMMISSION_PHYSICAL, 0.05),
+    digital: clamp(process.env.COMMISSION_DIGITAL, 0.15),
+    service: clamp(process.env.COMMISSION_SERVICE, 0.10),
+  });
+});
+
+/* ── /api/products/:id/download — expiring links for digital purchases ────
+   Buyer must hold a COMPLETED sale for the product (sellers get their own
+   files too). R2-hosted files come back as 1-hour signed URLs, so links
+   can't be shared publicly; local-disk files return their direct path. */
+router.get('/products/:id/download', authenticateToken, async (req: AuthRequest, res) => {
+  const product = await get<any>('SELECT * FROM bst_products WHERE id = ?', [req.params.id]);
+  if (!product) throw new AppError('Product not found', 404);
+
+  const isSeller = product.userId === uid(req);
+  if (!isSeller) {
+    const sale = await get<any>(
+      "SELECT id FROM bst_sales WHERE product_id = ? AND buyer_id = ? AND status = 'completed'",
+      [req.params.id, uid(req)]
+    );
+    if (!sale) throw new AppError('Purchase required', 403);
+  }
+
+  const trackIds: any[] = (() => { try { return JSON.parse(product.trackIds || '[]'); } catch { return []; } })();
+  const pubBase = (process.env.R2_PUBLIC_URL || '').replace(/\/+$/, '');
+  const links: { trackId: any; title: string; url: string; expiresInSeconds: number | null }[] = [];
+
+  for (const tid of trackIds.slice(0, 50)) {
+    const trk = await get<any>('SELECT id, title, file_url, stream_url FROM tracks WHERE id = ?', [tid]);
+    if (!trk) continue;
+    const fileUrl: string = trk.fileUrl || trk.streamUrl || '';
+    if (!fileUrl) continue;
+    if (pubBase && fileUrl.startsWith(pubBase + '/')) {
+      const key = fileUrl.slice(pubBase.length + 1);
+      try {
+        const signed = await getSignedUrl(key, 3600);
+        links.push({ trackId: trk.id, title: trk.title, url: signed, expiresInSeconds: 3600 });
+        continue;
+      } catch (e: any) {
+        console.error('[download] signing failed, falling back to public URL:', e?.message);
+      }
+    }
+    links.push({ trackId: trk.id, title: trk.title, url: fileUrl, expiresInSeconds: null });
+  }
+
+  if (!links.length) throw new AppError('This product has no downloadable files attached', 404);
+  res.json({ productId: product.id, name: product.name, links });
 });
 
 /* ── /api/stream — HLS fallback playlist (whole file as one segment) ───── */

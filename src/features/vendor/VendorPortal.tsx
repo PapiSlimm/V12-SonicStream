@@ -36,7 +36,12 @@ export const VendorPortal = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: '', price: '', description: '' });
+  const [form, setForm] = useState({ name: '', price: '', description: '', kind: 'digital' });
+  const [rates, setRates] = useState<Record<string, number>>({ default: 0.10, physical: 0.05, digital: 0.15, service: 0.10 });
+
+  useEffect(() => {
+    apiFetch<Record<string, number>>('/api/commission-rates').then(setRates).catch(() => {});
+  }, []);
 
   const isVendor = !!user && (isArtist || isCreator || user.userType === 'creator' || user.userType === 'artist');
 
@@ -64,9 +69,9 @@ export const VendorPortal = () => {
     }
     setCreating(true);
     try {
-      await commerceApi.products.create({ name: form.name, price, description: form.description, type: 'digital' } as any);
+      await commerceApi.products.create({ name: form.name, price, description: form.description, kind: form.kind } as any);
       toast.success('Product published to your storefront');
-      setForm({ name: '', price: '', description: '' });
+      setForm(f => ({ ...f, name: '', price: '', description: '' }));
       await load();
     } catch {
       toast.error('Could not create product');
@@ -165,8 +170,9 @@ export const VendorPortal = () => {
           <div className="bg-zinc-900 border border-white/5 rounded-2xl p-5 flex items-start gap-3">
             <BadgePercent className="text-emerald-500 shrink-0 mt-0.5" size={18} />
             <p className="text-sm text-zinc-400">
-              You keep <span className="text-white font-bold">90%</span> of every sale. The platform
-              fee funds payments, hosting, and your storefront — no listing fees, no monthly charges.
+              You keep <span className="text-white font-bold">85–95%</span> of every sale depending on
+              product type (physical {Math.round((1 - (rates.physical ?? 0.05)) * 100)}%, service {Math.round((1 - (rates.service ?? 0.10)) * 100)}%, digital {Math.round((1 - (rates.digital ?? 0.15)) * 100)}%).
+              The fee funds payments, hosting, and your storefront — no listing fees, no monthly charges.
             </p>
           </div>
         </div>
@@ -195,6 +201,37 @@ export const VendorPortal = () => {
                 className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-emerald-500/50"
               />
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {(['digital', 'physical', 'service'] as const).map(k => (
+                <button
+                  key={k}
+                  onClick={() => setForm(f => ({ ...f, kind: k }))}
+                  className={cn(
+                    'px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all',
+                    form.kind === k ? 'bg-emerald-500 text-black' : 'bg-white/5 text-zinc-500 hover:bg-white/10'
+                  )}
+                >
+                  {k} · {Math.round((rates[k] ?? rates.default) * 100)}%
+                </button>
+              ))}
+            </div>
+            {Number(form.price) > 0 && (
+              <div className="bg-black/40 border border-emerald-500/20 rounded-xl p-4 text-sm">
+                {(() => {
+                  const price = Number(form.price) || 0;
+                  const rate = rates[form.kind] ?? rates.default;
+                  const fee = Math.round(price * rate * 100) / 100;
+                  const take = Math.round((price - fee) * 100) / 100;
+                  return (
+                    <div className="flex flex-wrap gap-x-8 gap-y-1">
+                      <span className="text-zinc-500">List price <span className="text-white font-bold">{money(price)}</span></span>
+                      <span className="text-zinc-500">Platform fee ({Math.round(rate * 100)}%) <span className="text-white font-bold">{money(fee)}</span></span>
+                      <span className="text-zinc-500">You keep <span className="text-emerald-400 font-black">{money(take)}</span></span>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
             <button
               onClick={createProduct}
               disabled={creating}
