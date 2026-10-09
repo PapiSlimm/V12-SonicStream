@@ -45,13 +45,15 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
 // playlist_tracks, so the client asks here instead.)
 // NOTE: must be registered before '/:id'.
 router.get('/membership/:trackId', authenticateToken, async (req: AuthRequest, res) => {
+  // CAST to TEXT so a non-numeric id never explodes Postgres's strict typing
+  // ("invalid input syntax for type integer") — SQLite was lenient here.
   const rows = await all<{ playlistId: number }>(`
     SELECT DISTINCT pt.playlist_id
     FROM playlist_tracks pt
     JOIN playlists p ON p.id = pt.playlist_id
     LEFT JOIN playlist_collaborators pc ON pc.playlist_id = p.id
-    WHERE pt.track_id = ? AND (p.user_id = ? OR pc.user_id = ?)
-  `, [req.params.trackId, req.user?.id, req.user?.id]);
+    WHERE CAST(pt.track_id AS TEXT) = ? AND (p.user_id = ? OR pc.user_id = ?)
+  `, [String(req.params.trackId), req.user?.id, req.user?.id]).catch(() => []);
   res.json({ playlistIds: (rows || []).map(r => String(r.playlistId)) });
 });
 
