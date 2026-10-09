@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/Button';
 import toast from 'react-hot-toast';
 import { cn } from '../../utils/cn';
 import { api } from '../../api';
-import { auth } from '../../firebase';
+import { getToken } from '../../lib/sonicAuth';
 
 export const ProfileSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -72,8 +72,8 @@ export const ProfileSettings: React.FC = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (!auth.currentUser) throw new Error('Not authenticated');
-      await api.artist.updateProfile(auth.currentUser.uid, {
+      if (!getToken()) throw new Error('Not authenticated');
+      await api.artist.updateProfile('me', {
         ...profile,
         socialLinks: profile.socialLinks,
         preferredGenres: profile.preferredGenres

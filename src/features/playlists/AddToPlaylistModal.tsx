@@ -1,24 +1,18 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  X, 
-  Plus, 
-  ListMusic, 
-  Check, 
+import {
+  X,
+  Plus,
+  ListMusic,
+  Check,
   Loader2,
   Music
 } from 'lucide-react';
-import { db, auth, handleFirestoreError, OperationType } from '../../firebase';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  updateDoc, 
-  doc, 
-  arrayUnion,
-  arrayRemove
-} from 'firebase/firestore';
+// 2026-10-08 Firebase removal phase 2: Firestore reads/writes replaced with
+// the platform's own /api/playlists endpoints (SONIC AUTH token via apiFetch).
+import { playlistsApi } from '../../api/playlists';
+import { apiFetch } from '../../api/apiFetch';
+import { getToken } from '../../lib/sonicAuth';
 import { Playlist, Track } from '../../types';
 import toast from 'react-hot-toast';
 import { cn } from '../../utils/cn';
@@ -30,20 +24,21 @@ interface AddToPlaylistModalProps {
 
 export const AddToPlaylistModal = ({ track, onClose }: AddToPlaylistModalProps) => {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [memberIds, setMemberIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPlaylists = async () => {
-      if (!auth.currentUser) return;
+      if (!getToken()) { setLoading(false); return; }
       try {
-        const q = query(
-          collection(db, 'playlists'),
-          where('userId', '==', auth.currentUser.uid)
-        );
-        const snapshot = await getDocs(q);
-        const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Playlist[];
-        setPlaylists(list);
+        const [list, membership] = await Promise.all([
+          playlistsApi.getAll(),
+          apiFetch<{ playlistIds: string[] }>(`/api/playlists/membership/${encodeURIComponent(track.id)}`)
+            .catch(() => ({ playlistIds: [] as string[] }))
+        ]);
+        setPlaylists(list || []);
+        setMemberIds(new Set((membership.playlistIds || []).map(String)));
       } catch (err) {
         console.error('Failed to fetch playlists', err);
       } finally {
@@ -51,34 +46,28 @@ export const AddToPlaylistModal = ({ track, onClose }: AddToPlaylistModalProps) 
       }
     };
     fetchPlaylists();
-  }, []);
+  }, [track.id]);
 
   const toggleTrackInPlaylist = async (playlist: Playlist) => {
-    setProcessingId(playlist.id);
-    const isInPlaylist = playlist.trackIds.includes(track.id);
-    
+    const pid = String(playlist.id);
+    setProcessingId(pid);
+    const isInPlaylist = memberIds.has(pid);
+
     try {
-      const playlistRef = doc(db, 'playlists', playlist.id);
-      await updateDoc(playlistRef, {
-        trackIds: isInPlaylist ? arrayRemove(track.id) : arrayUnion(track.id),
-        updatedAt: new Date().toISOString()
+      if (isInPlaylist) {
+        await playlistsApi.removeTrack(pid, track.id);
+      } else {
+        await playlistsApi.addTrack(pid, track.id);
+      }
+      setMemberIds(prev => {
+        const next = new Set(prev);
+        if (isInPlaylist) next.delete(pid); else next.add(pid);
+        return next;
       });
-      
-      setPlaylists(prev => prev.map(p => {
-        if (p.id === playlist.id) {
-          return {
-            ...p,
-            trackIds: isInPlaylist 
-              ? p.trackIds.filter(id => id !== track.id) 
-              : [...p.trackIds, track.id]
-          };
-        }
-        return p;
-      }));
-      
       toast.success(isInPlaylist ? 'Removed from playlist' : 'Added to playlist');
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `playlists/${playlist.id}`);
+      console.error('Playlist update failed', err);
+      toast.error('Could not update playlist. Try again.');
     } finally {
       setProcessingId(null);
     }
@@ -86,7 +75,7 @@ export const AddToPlaylistModal = ({ track, onClose }: AddToPlaylistModalProps) 
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
@@ -130,12 +119,13 @@ export const AddToPlaylistModal = ({ track, onClose }: AddToPlaylistModalProps) 
               </div>
             ) : (
               playlists.map(playlist => {
-                const isInPlaylist = playlist.trackIds.includes(track.id);
+                const pid = String(playlist.id);
+                const isInPlaylist = memberIds.has(pid);
                 return (
                   <button
-                    key={playlist.id}
+                    key={pid}
                     onClick={() => toggleTrackInPlaylist(playlist)}
-                    disabled={processingId === playlist.id}
+                    disabled={processingId === pid}
                     className={cn(
                       "w-full p-4 rounded-2xl flex items-center justify-between transition-all group",
                       isInPlaylist ? "bg-emerald-500/10 border-emerald-500/20" : "hover:bg-white/5 border-transparent"
@@ -151,14 +141,16 @@ export const AddToPlaylistModal = ({ track, onClose }: AddToPlaylistModalProps) 
                       </div>
                       <div className="text-left">
                         <p className={cn("font-bold", isInPlaylist ? "text-emerald-400" : "text-white")}>{playlist.title}</p>
-                        <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">{playlist.trackIds.length} Tracks</p>
+                        <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">
+                          {isInPlaylist ? 'In this playlist' : 'Tap to add'}
+                        </p>
                       </div>
                     </div>
                     <div className={cn(
                       "w-6 h-6 rounded-full flex items-center justify-center transition-all",
                       isInPlaylist ? "bg-zinc-700 text-white" : "bg-zinc-800 text-zinc-600 group-hover:text-zinc-400"
                     )}>
-                      {processingId === playlist.id ? (
+                      {processingId === pid ? (
                         <Loader2 size={14} className="animate-spin" />
                       ) : isInPlaylist ? (
                         <Check size={14} />
@@ -174,7 +166,7 @@ export const AddToPlaylistModal = ({ track, onClose }: AddToPlaylistModalProps) 
         </div>
 
         <div className="p-8 bg-black/40 border-t border-white/5">
-          <button 
+          <button
             onClick={onClose}
             className="w-full py-4 bg-zinc-800 text-white rounded-2xl font-black hover:bg-zinc-700 transition-all"
           >

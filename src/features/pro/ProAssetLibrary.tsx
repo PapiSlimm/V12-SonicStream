@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../../firebase';
+import { getStoredUser, fetchMe } from '../../lib/sonicAuth';
 import { ProAsset, User } from '../../types';
 import { 
   Download, 
@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../api';
-import { query, collection, where, getDocs } from 'firebase/firestore';
 
 interface ProAssetLibraryProps {
   onUseAsset?: (asset: ProAsset) => void;
@@ -30,12 +29,14 @@ export const ProAssetLibrary: React.FC<ProAssetLibraryProps> = ({ onUseAsset }) 
 
   useEffect(() => {
     const fetchUser = async () => {
-      if (auth.currentUser) {
-        const userDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', auth.currentUser.uid)));
-        if (!userDoc.empty) {
-          setUser(userDoc.docs[0].data() as User);
-        }
-      }
+      // 2026-10-08 Firebase removal phase 2: tier/profile now comes from the
+      // platform's own session (/api/auth/me), not a Firestore users query.
+      const cached = getStoredUser();
+      if (cached) setUser(cached as unknown as User);
+      try {
+        const fresh = await fetchMe();
+        if (fresh) setUser(fresh as unknown as User);
+      } catch { /* keep cached */ }
     };
 
     const fetchAssets = async () => {

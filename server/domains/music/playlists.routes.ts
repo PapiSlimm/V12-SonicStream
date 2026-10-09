@@ -34,7 +34,25 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     [result.lastID, req.user?.id, 'owner']
   );
 
-  res.json({ id: result.lastID, title, description, is_public, is_collaborative, cover_type });
+  // 2026-10-08: was `is_public, is_collaborative, cover_type` — undefined
+  // identifiers (destructured camelCase above), so every playlist create 500'd.
+  res.json({ id: result.lastID, title, description, isPublic, isCollaborative, coverType });
+});
+
+// Which of the current user's playlists contain a given track.
+// (2026-10-08, Firebase removal phase 2: AddToPlaylistModal used to read
+// trackIds arrays straight out of Firestore; SQL keeps membership in
+// playlist_tracks, so the client asks here instead.)
+// NOTE: must be registered before '/:id'.
+router.get('/membership/:trackId', authenticateToken, async (req: AuthRequest, res) => {
+  const rows = await all<{ playlistId: number }>(`
+    SELECT DISTINCT pt.playlist_id
+    FROM playlist_tracks pt
+    JOIN playlists p ON p.id = pt.playlist_id
+    LEFT JOIN playlist_collaborators pc ON pc.playlist_id = p.id
+    WHERE pt.track_id = ? AND (p.user_id = ? OR pc.user_id = ?)
+  `, [req.params.trackId, req.user?.id, req.user?.id]);
+  res.json({ playlistIds: (rows || []).map(r => String(r.playlistId)) });
 });
 
 // Get a single playlist with its tracks

@@ -9,8 +9,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useArtists, useTracks } from '../../hooks/useApi';
 import { soundEngine } from '../../services/soundEngine';
 import { api } from '../../api';
-import { db } from '../../firebase';
-import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { RadioHub } from './RadioHub';
 import { useNavigate } from 'react-router-dom';
@@ -34,13 +32,18 @@ export const StreamingPage = () => {
     }
   }, [initialTracks]);
 
+  // 2026-10-08 Firebase removal phase 2: the Firestore onSnapshot live feed is
+  // replaced with a light poll of the platform's own tracks API.
   useEffect(() => {
-    const q = query(collection(db, 'tracks'), where('status', '==', 'live'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const updatedTracks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Track));
-      setTracks(updatedTracks);
-    });
-    return () => unsubscribe();
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const latest = await api.tracks.getAll();
+        if (!cancelled && Array.isArray(latest) && latest.length > 0) setTracks(latest as Track[]);
+      } catch { /* keep current list */ }
+    };
+    const interval = setInterval(refresh, 60_000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
   const featuredArtists = artists.slice(0, 5);

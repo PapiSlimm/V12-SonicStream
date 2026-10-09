@@ -7,8 +7,8 @@ import { toast } from '../../components/ui/Toast';
 import { cn } from '../../utils/cn';
 import { aiService } from '../../services/aiService';
 import { MASTERING_PROFILES } from '../../constants';
-import { db, auth } from '../../firebase';
-import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { apiFetch, json } from '../../api/apiFetch';
+import { getToken } from '../../lib/sonicAuth';
 import { AudioVisualizer } from '../../components/AudioVisualizer';
 
 export const MasteringStudio = () => {
@@ -45,41 +45,30 @@ export const MasteringStudio = () => {
     fetchTracks();
   }, []);
 
-  useEffect(() => {
-    if (!auth.currentUser) return;
+  const loadPresets = async () => {
+    if (!getToken()) return;
+    try {
+      const rows = await apiFetch<any[]>('/api/ai/mastering-presets');
+      setPresets(rows || []);
+    } catch (err) {
+      console.error('Failed to load presets', err);
+    }
+  };
 
-    const q = query(
-      collection(db, 'mastering_presets'),
-      where('userId', '==', auth.currentUser.uid)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const presetsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setPresets(presetsData);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  useEffect(() => { loadPresets(); }, []);
 
   const handleSavePreset = async () => {
-    if (!presetName || !auth.currentUser) {
+    if (!presetName || !getToken()) {
       toast.error('Please enter a preset name');
       return;
     }
 
     setIsSavingPreset(true);
     try {
-      await addDoc(collection(db, 'mastering_presets'), {
-        userId: auth.currentUser.uid,
-        name: presetName,
-        profile: selectedProfile,
-        createdAt: serverTimestamp()
-      });
+      await apiFetch('/api/ai/mastering-presets', { method: 'POST', ...json({ name: presetName, profile: selectedProfile }) });
       toast.success('Preset saved successfully!');
       setPresetName('');
+      await loadPresets();
     } catch (err) {
       console.error(err);
       toast.error('Failed to save preset');
@@ -90,8 +79,9 @@ export const MasteringStudio = () => {
 
   const handleDeletePreset = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'mastering_presets', id));
+      await apiFetch(`/api/ai/mastering-presets/${id}`, { method: 'DELETE' });
       toast.success('Preset deleted');
+      await loadPresets();
     } catch (err) {
       console.error(err);
       toast.error('Failed to delete preset');

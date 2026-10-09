@@ -1,4 +1,9 @@
-import { auth } from '../firebase';
+/**
+ * 2026-10-08 — Firebase removal phase 2: this error-reporting helper existed
+ * only for Firestore operations, which no longer happen anywhere in the app.
+ * Kept as an inert stub (no firebase imports) so nothing stale can revive the
+ * dependency.
+ */
 
 export enum OperationType {
   CREATE = 'create',
@@ -9,57 +14,6 @@ export enum OperationType {
   WRITE = 'write',
 }
 
-export interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
-function safeJsonStringify(obj: any): string {
-  const seen = new Set();
-  return JSON.stringify(obj, (_key, value) => {
-    if (typeof value === 'object' && value !== null) {
-      if (seen.has(value)) {
-        return '[Circular]';
-      }
-      seen.add(value);
-    }
-    return value;
-  });
-}
-
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', safeJsonStringify(errInfo));
-  throw new Error(safeJsonStringify(errInfo));
-}
+export const handleFirestoreError = (error: unknown, _op?: OperationType, _path?: string | null) => {
+  console.error('[legacy firestore call]', error);
+};

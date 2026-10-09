@@ -897,4 +897,27 @@ router.post('/generate-song', authenticateToken, aiLimiter, async (req: AuthRequ
   });
 });
 
+
+/* ── Mastering presets (2026-10-08, Firebase removal phase 2) ─────────────
+   Previously Firestore collection 'mastering_presets'; now the shared DB. */
+router.get('/mastering-presets', authenticateToken, async (req: AuthRequest, res) => {
+  const rows = await all('SELECT * FROM mastering_presets WHERE user_id = ? ORDER BY created_at DESC', [req.user?.id]).catch(() => []);
+  res.json(rows || []);
+});
+
+router.post('/mastering-presets', authenticateToken, async (req: AuthRequest, res) => {
+  const { name, profile } = req.body || {};
+  if (!name) throw new AppError('name is required', 400);
+  const r = await run(
+    'INSERT INTO mastering_presets (user_id, name, profile) VALUES (?, ?, ?)',
+    [req.user?.id, String(name).slice(0, 120), profile || null]
+  );
+  res.json({ id: r.lastID, name, profile, success: true });
+});
+
+router.delete('/mastering-presets/:id', authenticateToken, async (req: AuthRequest, res) => {
+  await run('DELETE FROM mastering_presets WHERE id = ? AND user_id = ?', [req.params.id, req.user?.id]);
+  res.json({ success: true });
+});
+
 export default router;

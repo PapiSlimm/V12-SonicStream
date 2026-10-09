@@ -16,7 +16,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { auth } from '../../firebase';
+import { getStoredUser } from '../../lib/sonicAuth';
 import { Playlist, Track } from '../../types';
 import toast from 'react-hot-toast';
 import { cn } from '../../utils/cn';
@@ -146,8 +146,8 @@ export const PlaylistManager = () => {
     }
   });
 
-  const isOwner = selectedPlaylist?.userId === auth.currentUser?.uid;
-  const canEdit = isOwner || selectedPlaylist?.collaborators?.some((c: any) => c.userId === auth.currentUser?.uid && c.role === 'editor');
+  const isOwner = selectedPlaylist?.userId === getStoredUser()?.id;
+  const canEdit = isOwner || selectedPlaylist?.collaborators?.some((c: any) => c.userId === getStoredUser()?.id && c.role === 'editor');
 
   const handleCreatePlaylist = () => {
     if (!newTitle.trim()) return;

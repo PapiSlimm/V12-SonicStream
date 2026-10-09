@@ -1527,6 +1527,22 @@ export async function runMigrations(): Promise<void> {
     console.log('[MigrationService] Block #57 (events columns + verification_requests) applied.');
   }
 
+  // ── Block #58 (2026-10-08): Firebase removal phase 2 ───────────────────
+  // mastering_presets moves from Firestore into the shared DB
+  // (MasteringStudio client now reads/writes /api/ai/mastering-presets).
+  {
+    await execEach(`
+      CREATE TABLE IF NOT EXISTS mastering_presets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        profile TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch((e:any) => console.error('[MigrationService] block #58 failed:', e?.message));
+    console.log('[MigrationService] Block #58 (mastering_presets) applied.');
+  }
+
     console.log('[MigrationService] Database schema migrations completed successfully.');
 }
 

@@ -19,8 +19,7 @@ import {
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
-import { collection, query, getDocs, limit } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../../firebase';
+import { api } from '../../api';
 import { ProAsset, VideoSegment } from '../../types';
 import { motion } from 'framer-motion';
 
@@ -235,14 +234,12 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({ selectedAsset, onClear
     if (activeTab === 'assets' && proAssets.length === 0) {
       const fetchAssets = async () => {
         setLoadingAssets(true);
-        const path = 'pro_assets';
         try {
-          const q = query(collection(db, path), limit(12));
-          const snapshot = await getDocs(q);
-          const assets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProAsset));
-          setProAssets(assets);
+          // 2026-10-08 Firebase removal phase 2: pro assets now come from /api/assets.
+          const assets = await api.assets.getAll();
+          setProAssets((assets || []).slice(0, 12));
         } catch (error) {
-          handleFirestoreError(error, OperationType.GET, path);
+          console.error('Failed to load assets', error);
         } finally {
           setLoadingAssets(false);
         }

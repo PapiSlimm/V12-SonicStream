@@ -50,8 +50,20 @@ import {
   Camera
 } from 'lucide-react';
 import { usePlayTracking } from '../../hooks/usePlayTracking';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../../firebase';
+// 2026-10-08 Firebase removal phase 2: resume-position sync now lives in
+// localStorage (per-device resume; no external service in the path).
+const posKey = (uid: string, videoId: string | number) => `sonic_pos_${uid}_${videoId}`;
+const savePos = (uid: string, videoId: string | number, position: number) => {
+  try { localStorage.setItem(posKey(uid, videoId), JSON.stringify({ position, updatedAt: new Date().toISOString() })); } catch {}
+};
+const readPos = (uid: string, videoId: string | number): number | null => {
+  try {
+    const raw = localStorage.getItem(posKey(uid, videoId));
+    if (!raw) return null;
+    const p = JSON.parse(raw).position;
+    return typeof p === 'number' ? p : null;
+  } catch { return null; }
+};
 import { useAuth } from '../../context/AuthContext';
 import QRCode from 'qrcode';
 
@@ -336,22 +348,12 @@ const ShortPlayItem = ({
     if (!isActive || !user) return;
 
     const fetchLastPlayedPosition = async () => {
-      try {
-        const docRef = doc(db, 'last_played_positions', `${user.uid}_${video.id}`);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const pos = data.position;
-          if (pos && typeof pos === 'number' && pos > 1 && videoRef.current) {
-            console.log(`[FirebaseSync] Retrieved synced position for video ${video.id}: ${pos}s`);
-            videoRef.current.currentTime = pos;
-            setCurrentTime(pos);
-            setShowToast(`Synced position from another device: Resumed at ${formatTime(pos)}`);
-            setTimeout(() => setShowToast(null), 3500);
-          }
-        }
-      } catch (e) {
-        console.warn('[FirebaseSync] Error retrieving position:', e);
+      const pos = readPos(user.uid, video.id);
+      if (pos && pos > 1 && videoRef.current) {
+        videoRef.current.currentTime = pos;
+        setCurrentTime(pos);
+        setShowToast(`Resumed at ${formatTime(pos)}`);
+        setTimeout(() => setShowToast(null), 3500);
       }
     };
 
@@ -368,13 +370,7 @@ const ShortPlayItem = ({
       if (user && activeVideoElement) {
         const time = activeVideoElement.currentTime;
         if (time > 0.5 && time < duration - 1) {
-          const posDocId = `${user.uid}_${video.id}`;
-          setDoc(doc(db, 'last_played_positions', posDocId), {
-            videoId: String(video.id),
-            userId: user.uid,
-            position: time,
-            updatedAt: new Date().toISOString()
-          }).catch(() => {});
+          savePos(user.uid, video.id, time);
         }
       }
     };
@@ -874,13 +870,7 @@ const ShortPlayItem = ({
         if (now - lastSavedTimestampRef.current >= 5000 || Math.abs(time - lastSavedTimeRef.current) >= 5) {
           lastSavedTimestampRef.current = now;
           lastSavedTimeRef.current = time;
-          const posDocId = `${user.uid}_${video.id}`;
-          setDoc(doc(db, 'last_played_positions', posDocId), {
-            videoId: String(video.id),
-            userId: user.uid,
-            position: time,
-            updatedAt: new Date().toISOString()
-          }).catch((err) => console.warn('[FirebaseSync] Position update failed:', err));
+          savePos(user.uid, video.id, time);
         }
       }
     }
