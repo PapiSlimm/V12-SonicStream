@@ -1543,6 +1543,16 @@ export async function runMigrations(): Promise<void> {
     console.log('[MigrationService] Block #58 (mastering_presets) applied.');
   }
 
+  // ── Block #59 (2026-10-08): vendor commission ledger ───────────────────
+  // Store checkouts now record per-item pending sales with the commission
+  // split; the Stripe webhook flips them to completed on payment.
+  {
+    await execEach(`ALTER TABLE bst_sales ADD COLUMN status TEXT DEFAULT 'completed'`);
+    await execEach(`ALTER TABLE bst_sales ADD COLUMN quantity INTEGER DEFAULT 1`);
+    await execEach(`ALTER TABLE bst_sales ADD COLUMN commission_rate REAL`);
+    console.log('[MigrationService] Block #59 (bst_sales commission columns) applied.');
+  }
+
     console.log('[MigrationService] Database schema migrations completed successfully.');
 }
 

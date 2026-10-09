@@ -99,6 +99,17 @@ async function handleCheckoutCompleted(session: any) {
   const amountTotal = session.amount_total / 100;
   const { userId, artistId, trackTitle, orderType, printFileName, tier } = session.metadata ?? {};
 
+  // Store orders (2026-10-08): finalize the pending commission rows written
+  // at session creation. One UPDATE covers every line item of the cart.
+  if (orderType === 'store_order') {
+    const r = await db.run(
+      `UPDATE bst_sales SET status = 'completed' WHERE stripe_session_id = ? AND status = 'pending'`,
+      [session.id]
+    );
+    console.log(`[StripeWebhook] store_order ${session.id}: ${r?.changes ?? 0} sale row(s) completed.`);
+    return;
+  }
+
   // Handle Subscription Checkout and Affiliate Referral logic
   if (session.mode === 'subscription' || tier) {
     const subUserId = userId || session.metadata?.userId;

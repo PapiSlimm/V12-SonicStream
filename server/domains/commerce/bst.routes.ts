@@ -55,9 +55,9 @@ router.get('/storefront', async (_req, res) => {
 router.get('/earnings', authenticateToken, async (req: AuthRequest, res) => {
   const summary = await get<any>(
     `SELECT COUNT(*) as sales, COALESCE(SUM(amount),0) as gross, COALESCE(SUM(seller_revenue),0) as net
-     FROM bst_sales WHERE seller_id = ?`, [uid(req)]);
+     FROM bst_sales WHERE seller_id = ? AND status = 'completed'`, [uid(req)]);
   const recent = await all(
-    'SELECT * FROM bst_sales WHERE seller_id = ? ORDER BY created_at DESC LIMIT 50', [uid(req)]);
+    "SELECT * FROM bst_sales WHERE seller_id = ? AND status != 'pending' ORDER BY created_at DESC LIMIT 50", [uid(req)]);
   const published = await get<any>(
     "SELECT COUNT(*) as c FROM bst_products WHERE user_id = ? AND status = 'published'", [uid(req)]);
   res.json({

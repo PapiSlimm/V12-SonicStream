@@ -156,16 +156,36 @@ router.post('/sales/checkout', authenticateToken, async (req: AuthRequest, res) 
     return res.status(503).json({ error: 'payments_not_configured', message: 'Checkout is not enabled yet — payment processing is being set up.' });
   }
   const stripe = new Stripe(config.STRIPE_SECRET_KEY);
+
+  // ── Commission model (2026-10-08) ──────────────────────────────────────
+  // Funds settle in the PLATFORM Stripe account; the per-item split is
+  // computed here (server-side prices only — client amounts are never
+  // trusted) and recorded as pending bst_sales rows. The webhook marks them
+  // completed on payment. Vendor payouts are ledger-driven; swapping the
+  // payout step for Stripe Connect transfers later won't touch this math.
+  const COMMISSION_RATE = Math.min(0.5, Math.max(0, Number(process.env.COMMISSION_RATE || 0.10)));
+
   const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+  const resolved: { productId: string; sellerId: string | null; trackId: number | null; qty: number; unitCents: number }[] = [];
   for (const it of items.slice(0, 20)) {
-    const p = await get<any>('SELECT * FROM bst_products WHERE id = ?', [it.productId])
-      || await get<any>('SELECT id, title as name, price FROM tracks WHERE id = ?', [it.productId]);
+    const bst = await get<any>('SELECT * FROM bst_products WHERE id = ?', [it.productId]);
+    const trk = bst ? null : await get<any>('SELECT id, artist_id, title as name, price FROM tracks WHERE id = ?', [it.productId]);
+    const p = bst || trk;
     if (!p) continue;
+    const qty = Math.max(1, Number(it.quantity) || 1);
+    const unitCents = Math.round(Number(p.price || 0) * 100) || 100;
+    resolved.push({
+      productId: String(it.productId),
+      sellerId: (bst ? (bst.userId || bst.createdBy || null) : (trk?.artistId ?? null)) as string | null,
+      trackId: trk ? Number(trk.id) : null,
+      qty,
+      unitCents,
+    });
     line_items.push({
-      quantity: Math.max(1, Number(it.quantity) || 1),
+      quantity: qty,
       price_data: {
         currency: 'usd',
-        unit_amount: Math.round(Number(p.price || 0) * 100) || 100,
+        unit_amount: unitCents,
         product_data: { name: String(p.name || p.title || 'SonicStream item').slice(0, 120) },
       },
     });
@@ -176,8 +196,21 @@ router.post('/sales/checkout', authenticateToken, async (req: AuthRequest, res) 
     line_items,
     success_url: `${config.APP_URL}/store/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${config.APP_URL}/store`,
-    metadata: { userId: String(uid(req) || ''), items: JSON.stringify(items.slice(0, 20)) },
+    metadata: { userId: String(uid(req) || ''), orderType: 'store_order' },
   });
+
+  // Pending commission rows, one per line item — finalized by the webhook.
+  for (const r of resolved) {
+    const grossUsd = (r.unitCents * r.qty) / 100;
+    const platformUsd = Math.round(grossUsd * COMMISSION_RATE * 100) / 100;
+    const sellerUsd = Math.round((grossUsd - platformUsd) * 100) / 100;
+    await run(
+      `INSERT INTO bst_sales (product_id, seller_id, buyer_id, track_id, amount, seller_revenue, platform_revenue, stripe_session_id, status, quantity, commission_rate)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      [r.productId, r.sellerId, uid(req), r.trackId, grossUsd, sellerUsd, platformUsd, session.id, r.qty, COMMISSION_RATE]
+    ).catch((e: any) => console.error('[checkout] failed to record pending sale:', e?.message));
+  }
+
   res.json({ url: session.url });
 });
 

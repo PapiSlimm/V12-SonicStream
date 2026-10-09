@@ -43,6 +43,7 @@ const PlaylistManager = lazy(() => import('../features/playlists/PlaylistManager
 const ProfileSettings = lazy(() => import('../features/profile/ProfileSettings').then(m => ({ default: m.ProfileSettings })));
 const AdminPanel = lazy(() => import('../features/admin/V12AdminDashboard').then(m => ({ default: m.V12AdminDashboard })));
 const Marketplace = lazy(() => import('../features/marketplace/Marketplace'));
+const VendorPortal = lazy(() => import('../features/vendor/VendorPortal').then(m => ({ default: m.VendorPortal })));
 const RadioHub = lazy(() => import('../features/radio/RadioHub').then(m => ({ default: m.RadioHub })));
 const NewsWall = lazy(() => import('../features/rss/NewsWall').then(m => ({ default: m.NewsWall })));
 const DMCAPortal = lazy(() => import('../features/legal/DMCAPortal').then(m => ({ default: m.DMCAPortal })));
@@ -113,6 +114,7 @@ export const AppRouter = () => {
       <Route path="/draft-landing" element={wrap(<LandingDraft />)} />
       <Route path="/search" element={wrap(<SearchPage />)} />
       <Route path="/marketplace" element={wrap(<Marketplace />)} />
+      <Route path="/vendor" element={wrap(<VendorPortal />)} />
       <Route path="/radio" element={wrap(<RadioHub />)} />
       <Route path="/news" element={wrap(<NewsWall type="news" />)} />
       <Route path="/legal/dmca" element={wrap(<DMCAPortal />)} />
